@@ -1,0 +1,24 @@
+{
+  "supabaseUrl": "https://droxrfmvpcdfmosgalaf.supabase.co",
+  "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyb3hyZm12cGNkZm1vc2dhbGFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODkwMTUsImV4cCI6MjA5NTk2NTAxNX0.YjeuHX1CDJJelBlAAKiygdZOWRndQDTha0eZIxMeQCE",
+  "startDate": "2026-06-01T00:00:00",
+  "endDate": "2026-06-30T23:59:00",
+  "drawDate": "2026-07-02T12:00:00",
+  "registrationEnabled": true,
+  "winnersPublished": false,
+  "minPurchaseAmount": 1500,
+  "heroTitle": "Отпразднуй день рождения сети салонов GO вместе с нами!",
+  "heroSubtitle": "Выиграй главный приз — смартфон Xiaomi!",
+  "prizes": [
+    { "id": 1, "name": "Смартфон Redmi Note 15 Pro Plus 5G 8/256", "link": "https://go-go.md/products/smartfon-xiaomi-redmi-note-15-pro-plus-5g-8256-simesim-glacier-blue?ysclid=mpx3ampj4b351101638" },
+    { "id": 2, "name": "Матрас туристический Youpin One Night Automatic Inflatable Leisure Bed PS1", "link": "https://go-go.md/products/matras-turisticheskij-youpin-one-night-automatic-inflatable-leisure-bed-ps1" },
+    { "id": 3, "name": "Видеорегистратор HOCO DV8 with rear camera", "link": "https://go-go.md/products/videoregistrator-hoco-dv8-with-rear-camera" },
+    { "id": 4, "name": "Наушники Baseus Bluetooth BH1 NC Black", "link": "https://go-go.md/products/naushniki-baseus-bluetooth-bh1-nc-black?ysclid=mpx3di7gle345525462" },
+    { "id": 5, "name": "Часы Xiaomi Redmi Watch 5 Active", "link": "https://go-go.md/products/chasy-smart-xiaomi-redmi-watch-5-active-midnight-black?ysclid=mpx3eahvbl435424453" },
+    { "id": 6, "name": "Колонка Blackview Bluetooth Aurabass 3 16W", "link": "https://go-go.md/products/kolonka-blackview-bluetooth-aurabass-3-16w-black?ysclid=mpx3etmup1894917485" },
+    { "id": 7, "name": "Весы Xiaomi Mi Body Composition Scale S400", "link": "https://go-go.md/products/vesy-napolnye-xiaomi-mi-body-composition-scale-s400?ysclid=mpx3fbfdhj409410102" },
+    { "id": 8, "name": "Наушники Xiaomi Bluetooth Redmi Buds 6 Play", "link": "https://go-go.md/products/naushniki-xiaomi-bluetooth-redmi-buds-6-play-black?ysclid=mpx3fprpsz971563198" },
+    { "id": 9, "name": "Ночник Cute Panda", "link": "https://go-go.md/products/nochniki-k-1155-cute-panda-panda?ysclid=mpx3g0uwwy472127586" },
+    { "id": 10, "name": "Наушники Xiaomi Headphones Basic", "link": "https://go-go.md/products/naushniki-xiaomi-headphones-basic-chernye?ysclid=mpx3gmv1zp933702573" }
+  ]
+}

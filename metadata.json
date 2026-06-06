@@ -1,0 +1,6 @@
+{
+  "name": "GO Promo",
+  "description": "Юбилейная акция GO: регистрация чеков, панель администратора и интеграция с Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

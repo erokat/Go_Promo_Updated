@@ -1,0 +1,1062 @@
+@import url('https://fonts.googleapis.com/css2?family=Scada:ital,wght@0,400;0,700;1,400;1,700&family=Fira+Sans:wght@400;500;600;700&display=swap');
+
+/* Основные переменные для фирменного стиля: зеленый + темный */
+:root {
+    --primary: #06a658;
+    --primary-hover: #058e4a;
+    --secondary: #1a1a1a;
+    --bg-color: #121212;
+    --text-color: #e0e0e0;
+    --text-muted: #888888;
+    --card-bg: #1e1e1e;
+    --border-color: #333333;
+    --error: #cf6679;
+    --success: #06a658;
+    --shadow: 0 4px 6px rgba(0,0,0,0.5);
+    --shadow-hover: 0 10px 20px rgba(25, 163, 105, 0.2);
+    --radius: 4px; /* GO uses somewhat sharper corners */
+    --font-family: 'Fira Sans', Arial, sans-serif;
+    --font-heading: 'Scada', sans-serif;
+}
+
+/* Сброс базовых стилей */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+/* Утилиты */
+.hidden {
+    display: none !important;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+/* ---- Шапка (Header) ---- */
+.header {
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-container {
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: 0 20px;
+    }
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 70px;
+}
+
+.navbar-brand {
+    display: block;
+    width: 120px;
+    height: 60px;
+    background-image: url("./logo.png");
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: contain;
+}
+
+/* Фирменные разделители GO */
+.brand-divider {
+    height: 5px;
+    background-color: var(--primary);
+    width: 100%;
+}
+
+/* ---- Кнопки ---- */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-heading);
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    box-shadow: var(--shadow-hover);
+}
+
+.btn-outline {
+    background-color: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    font-family: var(--font-heading);
+}
+
+.btn-outline:hover {
+    background-color: var(--primary);
+    color: #fff;
+}
+
+.btn-success {
+    background-color: var(--success);
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: #27ae60;
+}
+
+/* ---- Баннер (Hero) ---- */
+.hero {
+    background: #111111;
+    color: #ffffff;
+    padding: 60px 0 40px;
+    text-align: center;
+    border-bottom: 5px solid var(--primary);
+}
+
+.hero h1 {
+    font-size: 1.55rem;
+    margin-bottom: 15px;
+    color: var(--primary);
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+@media (max-width: 992px) {
+    .hero h1 {
+        white-space: normal;
+        font-size: 1.4rem;
+    }
+    #hero-prize-text {
+        font-size: 1.8rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero h1 {
+        font-size: 0.85rem;
+    }
+    #hero-prize-text {
+        font-size: 1.7rem !important;
+    }
+}
+
+/* ---- Отсчет времени (Countdown) ---- */
+.countdown-wrapper {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 25px;
+    border-radius: var(--radius);
+    max-width: 500px;
+    margin: 30px auto;
+    box-shadow: var(--shadow);
+}
+
+.countdown-wrapper h3 {
+    margin-bottom: 15px;
+    color: var(--text-color);
+    font-size: 1.2rem;
+}
+
+.countdown {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.countdown-item {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    min-width: 80px;
+    padding: 15px 10px;
+    border-radius: var(--radius);
+}
+
+.countdown-item span {
+    display: block;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: var(--font-heading);
+    line-height: 1;
+}
+
+.countdown-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 5px;
+    letter-spacing: 1px;
+}
+
+.countdown-message {
+    margin-top: 15px;
+    font-size: 1.1rem;
+    color: var(--primary);
+    font-weight: 600;
+    font-family: var(--font-heading);
+}
+
+.rules {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 25px;
+    border-radius: var(--radius);
+    max-width: 650px;
+    margin: 30px auto 0;
+    text-align: left;
+    backdrop-filter: blur(5px);
+    border: 1px solid var(--border-color);
+}
+
+.rules h3 {
+    margin-bottom: 10px;
+    color: var(--primary);
+}
+
+.rules ul {
+    list-style-position: inside;
+}
+
+/* ---- Секции и Формы ---- */
+.registration-form {
+    padding: 60px 0;
+}
+
+.winners-section {
+    padding: 60px 0;
+    display: none; /* Скрыто по умолчанию до загрузки или истечения таймера */
+}
+
+.registration-form h2, .winners-section h2, #adminView h2 {
+    text-align: center;
+    margin-bottom: 40px;
+    font-size: 2.2rem;
+    color: var(--primary);
+}
+
+#promoForm {
+    background: var(--card-bg);
+    padding: 40px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    max-width: 550px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-family: inherit;
+    background-color: #121212;
+    color: var(--text-color);
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.phone-input-group {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+}
+
+.phone-prefix {
+    background-color: #1a1a1a;
+    color: var(--primary);
+    font-family: var(--font-heading);
+    font-weight: 700;
+    padding: 14px 20px;
+    border: 1px solid var(--border-color);
+    border-right: none;
+    border-top-left-radius: var(--radius);
+    border-bottom-left-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    font-size: 1.1rem;
+    min-width: 80px;
+}
+
+.phone-input-group input {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    flex: 1;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(25, 163, 105, 0.2);
+}
+
+#promoForm button {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.1rem;
+}
+
+/* Сообщения */
+.message {
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: var(--radius);
+    display: none;
+    text-align: center;
+    font-weight: 500;
+}
+
+.message.success {
+    display: block;
+    background-color: rgba(46, 204, 113, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.message.error {
+    display: block;
+    background-color: rgba(231, 76, 60, 0.1);
+    color: var(--error);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.message.info {
+    display: block;
+    background-color: rgba(25, 163, 105, 0.1);
+    color: var(--primary);
+    border: 1px solid rgba(25, 163, 105, 0.3);
+}
+
+/* ---- Победители ---- */
+.winners-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+}
+
+.winner-card {
+    background: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    text-align: center;
+    border-top: 5px solid var(--primary);
+    animation: fadeIn 0.6s ease-out;
+    transition: transform 0.3s;
+}
+
+.winner-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-hover);
+}
+
+.winner-card h4 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+.winner-card .receipt {
+    font-family: monospace;
+    font-size: 1.2rem;
+    background: #121212;
+    padding: 5px 10px;
+    border-radius: 4px;
+    color: var(--text-color);
+    margin-bottom: 15px;
+    display: inline-block;
+    border: 1px solid var(--border-color);
+}
+
+.winner-card .date {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Модальные окна ---- */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 40px;
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 450px;
+    position: relative;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+}
+
+.modal-content h2 {
+    margin-bottom: 25px;
+    color: var(--text-color);
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 1.8rem;
+    cursor: pointer;
+    color: #999;
+    transition: color 0.3s;
+}
+
+.close-btn:hover {
+    color: var(--error);
+}
+
+.instruction-box {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #ccc;
+    text-align: left;
+    background: #111;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+}
+
+.instruction-box ol { margin-left: 20px; margin-top: 10px; }
+.instruction-box li { margin-bottom: 8px; }
+
+/* ---- Панель Администратора ---- */
+#adminView {
+    padding: 40px 0;
+}
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.stat-card h4 {
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.stat-card p {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.admin-actions {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.admin-actions button {
+    padding: 15px 30px;
+    font-size: 1.1rem;
+}
+
+.admin-search {
+    margin-bottom: 25px;
+}
+
+.admin-search input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    background-color: #121212;
+    color: var(--text-color);
+}
+
+.participants-list h3 {
+    margin-bottom: 20px;
+    color: var(--text-color);
+}
+
+.table-responsive {
+    overflow-x: auto;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 18px 20px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+th {
+    background-color: #121212;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+tbody tr:hover {
+    background-color: #242424;
+}
+
+.load-more-container {
+    text-align: center;
+    margin-top: 25px;
+}
+
+/* ---- Адаптивность (Mobile) ---- */
+@media (max-width: 768px) {
+    .admin-stats {
+        grid-template-columns: 1fr;
+    }
+    .hero h1 {
+        font-size: 2.2rem;
+    }
+    .hero {
+        padding: 40px 0;
+    }
+    .countdown-wrapper {
+        padding: 16px 12px;
+        margin: 20px auto;
+        max-width: 92%;
+    }
+    .countdown-wrapper h3 {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+    }
+    .countdown {
+        gap: 8px;
+    }
+    .countdown-item {
+        min-width: 65px;
+        padding: 10px 4px;
+    }
+    .countdown-item span {
+        font-size: 1.6rem;
+    }
+    .countdown-label {
+        font-size: 0.72rem;
+        letter-spacing: 0.5px;
+        margin-top: 3px;
+    }
+    table, th, td {
+        font-size: 0.9rem;
+        padding: 12px 10px;
+    }
+}
+
+::selection {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
+
+/* Анимация вращения спиннера */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ---- Призы (Prizes) ---- */
+.prizes-section {
+    padding: 40px 0 60px;
+    background-color: var(--secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.rules-section {
+    padding: 60px 0;
+    background-color: #0a0a0a;
+}
+
+.prizes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.prize-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+}
+
+.prize-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary);
+}
+
+.prize-rank {
+    background-color: rgba(25, 163, 105, 0.1);
+    color: var(--primary);
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(25, 163, 105, 0.3);
+}
+
+.prize-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-color);
+    line-height: 1.4;
+}
+
+/* Убираем стрелочки (spin buttons) у поля ввода суммы */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+/* ---- Кастомизация Flatpickr в стиле GO ---- */
+.flatpickr-calendar {
+    border-radius: var(--radius) !important;
+    border: 2px solid var(--primary) !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.9), 0 0 15px rgba(25, 163, 105, 0.3) !important;
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    font-family: inherit !important;
+}
+.flatpickr-calendar.arrowTop:after {
+    border-bottom-color: var(--card-bg) !important;
+}
+.flatpickr-calendar.arrowBottom:after {
+    border-top-color: var(--card-bg) !important;
+}
+.flatpickr-calendar.arrowTop:before {
+    border-bottom-color: var(--primary) !important;
+}
+.flatpickr-calendar.arrowBottom:before {
+    border-top-color: var(--primary) !important;
+}
+.flatpickr-months {
+    background-color: var(--card-bg) !important;
+}
+.flatpickr-months .flatpickr-month {
+    color: var(--text-color) !important;
+    fill: var(--text-color) !important;
+}
+.flatpickr-months .flatpickr-prev-month, 
+.flatpickr-months .flatpickr-next-month {
+    color: var(--text-color) !important;
+    fill: var(--text-color) !important;
+}
+.flatpickr-months .flatpickr-prev-month:hover svg, 
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: var(--primary) !important;
+}
+.flatpickr-current-month .numInputWrapper span.arrowUp:after {
+    border-bottom-color: var(--text-color) !important;
+}
+.flatpickr-current-month .numInputWrapper span.arrowDown:after {
+    border-top-color: var(--text-color) !important;
+}
+.flatpickr-current-month input.cur-year {
+    color: var(--text-color) !important;
+    font-family: inherit !important;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    color: var(--text-color) !important;
+    background: var(--card-bg) !important;
+    font-family: inherit !important;
+}
+span.flatpickr-weekday {
+    color: var(--text-color) !important;
+    font-weight: 700 !important;
+}
+.flatpickr-day {
+    color: var(--text-color) !important;
+}
+.flatpickr-day.flatpickr-disabled, 
+.flatpickr-day.flatpickr-disabled:hover,
+.flatpickr-day.prevMonthDay, 
+.flatpickr-day.nextMonthDay, 
+.flatpickr-day.notAllowed, 
+.flatpickr-day.notAllowed.prevMonthDay, 
+.flatpickr-day.notAllowed.nextMonthDay {
+    color: rgba(255, 255, 255, 0.25) !important;
+    background: transparent !important;
+}
+.flatpickr-day.selected, 
+.flatpickr-day.selected:focus, 
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected.prevMonthDay, 
+.flatpickr-day.selected.nextMonthDay {
+    background: var(--primary) !important;
+    border-color: var(--primary) !important;
+    color: #fff !important;
+}
+.flatpickr-day:hover, 
+.flatpickr-day.prevMonthDay:hover, 
+.flatpickr-day.nextMonthDay:hover, 
+.flatpickr-day.today:hover, 
+.flatpickr-day.today.prevMonthDay:hover, 
+.flatpickr-day.today.nextMonthDay:hover {
+    background: rgba(25, 163, 105, 0.2) !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
+}
+.flatpickr-day.today {
+    border-color: var(--primary) !important;
+}
+.flatpickr-time {
+    border-top: 1px solid var(--border-color) !important;
+    background-color: var(--card-bg) !important;
+}
+.flatpickr-time .numInputWrapper {
+    color: var(--text-color) !important;
+}
+.flatpickr-time input {
+    color: var(--text-color) !important;
+}
+.flatpickr-time input:focus, 
+.flatpickr-time select:focus {
+    background: rgba(25, 163, 105, 0.1) !important;
+}
+.flatpickr-time .flatpickr-time-separator {
+    color: var(--text-color) !important;
+}
+.flatpickr-time .flatpickr-am-pm {
+    color: var(--text-color) !important;
+}
+
+/* Скрываем стрелочки переключения (вверх/вниз) во всех полях Flatpickr */
+.flatpickr-calendar .numInputWrapper span {
+    display: none !important;
+}
+
+/* flatpickr mobile adjustments */
+.flatpickr-calendar {
+    max-width: 280px !important;
+}
+
+@media (max-width: 480px) {
+    .flatpickr-calendar {
+        font-size: 13px !important;
+    }
+    .flatpickr-day {
+        max-width: 32px !important;
+        height: 32px !important;
+        line-height: 32px !important;
+    }
+    .flatpickr-innerContainer, .flatpickr-rContainer {
+        width: 100% !important;
+    }
+    .flatpickr-days {
+        width: auto !important;
+    }
+    .dayContainer {
+        min-width: unset !important;
+        max-width: unset !important;
+        width: 100% !important;
+    }
+    .flatpickr-current-month {
+        font-size: 110% !important;
+        padding: 0 !important;
+    }
+    .flatpickr-calendar.hasTime .flatpickr-time {
+        height: 35px !important;
+        line-height: 35px !important;
+    }
+}
+
+/* ---- Кастомный iOS-стиль Колеса Выбора Времени ---- */
+.ios-time-picker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-end; /* Выдвигается снизу */
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.ios-time-picker-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ios-time-picker-container {
+    width: 100%;
+    max-width: 480px;
+    background: var(--card-bg, #1e1e1e);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border: 1px solid var(--border-color, #333);
+    border-bottom: none;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.1, 0.76, 0.55, 0.94);
+    padding-bottom: max(15px, env(safe-area-inset-bottom)); /* поддержка челки/кнопки Home на iOS */
+    overflow: hidden;
+}
+
+.ios-time-picker-overlay.active .ios-time-picker-container {
+    transform: translateY(0);
+}
+
+.ios-time-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #333);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.ios-time-picker-btn {
+    background: none;
+    border: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 4px;
+    outline: none;
+    transition: opacity 0.2s;
+}
+
+.ios-time-picker-btn:active {
+    opacity: 0.6;
+}
+
+.ios-time-picker-btn-cancel {
+    color: var(--text-muted, #888);
+}
+
+.ios-time-picker-btn-done {
+    color: var(--primary, #06a658);
+}
+
+.ios-time-picker-title {
+    color: var(--text-color, #e0e0e0);
+    font-family: var(--font-heading, inherit);
+    font-weight: 700;
+    font-size: 1.15rem;
+}
+
+.ios-time-picker-body {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 15px;
+    height: 220px;
+    background: var(--card-bg, #1e1e1e);
+    overflow: hidden;
+}
+
+/* 3 крутящиеся колонки */
+.ios-time-picker-wheel {
+    position: relative;
+    flex: 1;
+    max-width: 90px;
+    height: 200px;
+    overflow-y: scroll;
+    scroll-behavior: auto;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none; /* Скрытие scrollbar для Firefox */
+    -ms-overflow-style: none; /* Скрытие scrollbar для IE/Edge */
+    padding-top: 80px; /* (200px - 40px) / 2 */
+    padding-bottom: 80px;
+    box-sizing: border-box;
+    z-index: 2;
+}
+
+.ios-time-picker-wheel::-webkit-scrollbar {
+    display: none; /* Скрытие scrollbar для Safari/Chrome */
+}
+
+/* Элементы внутри колонки */
+.ios-time-picker-item {
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    font-size: 1.45rem;
+    font-weight: 500;
+    color: var(--text-muted, #888);
+    scroll-snap-align: center;
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.15s ease, font-weight 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.ios-time-picker-item.selected {
+    color: var(--primary, #06a658);
+    font-weight: 700;
+    font-size: 1.65rem;
+    transform: scale(1.08);
+}
+
+/* Подписи-буквы рядом */
+.ios-time-picker-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.ios-time-picker-label {
+    flex: 1;
+    max-width: 90px;
+    text-align: right;
+    padding-right: 14px;
+    box-sizing: border-box;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary, #06a658);
+    opacity: 0.75;
+    transform: translateY(2px);
+}
+
+/* Выделение центральной выбранной строки */
+.ios-time-picker-selection-highlight {
+    position: absolute;
+    left: 15px;
+    right: 15px;
+    height: 40px;
+    top: 90px; /* (220px - 40px) / 2 */
+    background: rgba(6, 166, 88, 0.1);
+    border-top: 1px solid rgba(6, 166, 88, 0.3);
+    border-bottom: 1px solid rgba(6, 166, 88, 0.3);
+    border-radius: var(--radius, 4px);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* 3D эффект цилиндрического затухания сверху и снизу */
+.ios-time-picker-shading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, 
+      var(--card-bg, #1e1e1e) 0%, 
+      rgba(30, 30, 30, 0.85) 15%, 
+      rgba(30, 30, 30, 0) 40%, 
+      rgba(30, 30, 30, 0) 60%, 
+      rgba(30, 30, 30, 0.85) 85%, 
+      var(--card-bg, #1e1e1e) 100%
+    );
+    pointer-events: none;
+    z-index: 3;
+}

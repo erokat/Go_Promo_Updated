@@ -1,0 +1,19 @@
+{
+  "name": "go-lottery-site",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "echo 'No linting required for static assets'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.107.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.3"
+  }
+}
