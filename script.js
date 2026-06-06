@@ -6,6 +6,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
  */
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const bootStartTime = performance.now();
   // ---- СОСТОЯНИЕ И КОНФИГУРАЦИЯ ----
   let config = {};
   let participants = []; // Локальная база для демо-режима и кэш для админки
@@ -70,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (parsed.minPurchaseAmount) config.minPurchaseAmount = parseFloat(parsed.minPurchaseAmount);
           if (parsed.heroTitle) config.heroTitle = parsed.heroTitle;
           if (parsed.heroSubtitle) config.heroSubtitle = parsed.heroSubtitle;
+          if (parsed.configHash) config.configHash = parsed.configHash;
         } catch (e) {
           console.error("Ошибка при чтении локальных настроек:", e);
         }
@@ -91,6 +93,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           config.minPurchaseAmount = parseFloat(settingsMap.minPurchaseAmount || "1500");
           config.heroTitle = settingsMap.heroTitle;
           config.heroSubtitle = settingsMap.heroSubtitle;
+          config.configHash = settingsMap.configHash || "";
         }
       } catch (err) {
         console.warn("Ошибка при получении настроек из Supabase:", err);
@@ -221,8 +224,47 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function saveToCache() {
+  // Быстрое синхронное хэширование строки (алгоритм FNV-1a HEX)
+  function generateDataHash(str) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  }
+
+  // Расчет хэша конфигурации первого экрана
+  function calculateConfigHash(drawDate, heroTitle, heroSubtitle, minAmount, prizes) {
+    const cleanPrizes = (prizes || []).slice().sort((a, b) => (a.id || 0) - (b.id || 0)).map(p => ({
+      id: p.id || 0,
+      name: p.name || "",
+      link: p.link || ""
+    }));
+    
+    const rawString = JSON.stringify({
+      drawDate: drawDate || "",
+      heroTitle: heroTitle || "",
+      heroSubtitle: heroSubtitle || "",
+      minAmount: String(minAmount || "1500"),
+      prizes: cleanPrizes
+    });
+
+    return generateDataHash(rawString);
+  }
+
+  function saveToCache(customHash = null) {
     try {
+      const activeHash = customHash || calculateConfigHash(
+        config.drawDate,
+        config.heroTitle,
+        config.heroSubtitle,
+        config.minPurchaseAmount,
+        config.prizes
+      );
+
+      config.configHash = activeHash;
+
       const cacheData = {
         cache_version: CACHE_VERSION,
         lastUpdated: Date.now(),
@@ -234,70 +276,187 @@ document.addEventListener("DOMContentLoaded", async () => {
           winnersPublished: config.winnersPublished === true,
           minPurchaseAmount: config.minPurchaseAmount || 1500,
           heroTitle: config.heroTitle || "",
-          heroSubtitle: config.heroSubtitle || ""
+          heroSubtitle: config.heroSubtitle || "",
+          configHash: activeHash
         },
         prizes: config.prizes || []
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-      console.log("Локальный кэш успешно обновлен:", cacheData);
+      console.log(`%c[Cache System] Локальный кэш успешно обновлен. Хэш: ${activeHash}`, "color: #00bcd4; font-weight: bold;");
     } catch (err) {
       console.warn("Ошибка записи кэша в localStorage:", err);
     }
   }
 
-  // Применяем кэш мгновенно при старте скрипта (до любых сетевых запросов к Supabase/серверу)
-  applyCache();
+  // Флаг, предотвращающий повторные или преждевременные скрытия прелоадера
+  let isPreloaderHidden = false;
 
-  // 1. Инициализация (Загрузка конфигурации)
+  // Считываем локальный кэш заранее для оценки версии
+  let hasLocalCache = false;
+  let localHash = "";
+
   try {
-    const fetchUrl = "config.json?v=" + Date.now();
-    const res = await fetch(fetchUrl);
-    if (!res.ok) {
-      throw new Error(`Статус ответа: ${res.status}`);
-    }
-    const serverConfig = await res.json();
-    
-    // Объединяем полученный конфиг с текущим состоянием (чтобы сохранить временные значения кэша)
-    config = { ...config, ...serverConfig };
-    
-    // Проверяем наличие ключей Supabase. Если их нет, включаем демо-режим.
-    useMock = !config.supabaseUrl || config.supabaseUrl.trim() === "" || config.supabaseUrl === "https://your-project-id.supabase.co";
-
-    if (!useMock) {
-      supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
-    }
-
-    // Загружаем динамические настройки из Supabase / LocalStorage
-    await loadSettings();
-    await loadPrizes();
-
-    // Обновляем тексты и инициализируем календарь со свежими данными
-    updateDynamicDateTexts();
-    initDatePicker();
-    checkRegistrationPeriod();
-    
-    // Сохраняем в кэш полученное актуальное состояние для последующих входов
-    saveToCache();
-
-    // Авто-проверка сессии Supabase (сохранение логина при обновлении)
-    if (supabase) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        adminToken = session.access_token;
-        adminUserEmail = (session.user && session.user.email) || "admin";
-        isAdmin = true;
-        proceedLogin(true); // Тихий вход при обновлении страницы
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const cache = JSON.parse(cached);
+      if (cache && cache.cache_version === CACHE_VERSION && cache.config && cache.prizes) {
+        localHash = cache.config.configHash || "";
+        hasLocalCache = true;
       }
     }
-
-  } catch (err) {
-    console.error("Критическая ошибка инициализации:", err);
-    useMock = true;
-    await loadSettings();
-    updateDynamicDateTexts();
-    initDatePicker();
-    checkRegistrationPeriod();
+  } catch (e) {
+    console.warn("Ошибка предварительного разбора локального кэша:", e);
   }
+
+  // Скрываем прелоадер
+  function hidePreloader(source = "normal") {
+    if (isPreloaderHidden) return;
+    isPreloaderHidden = true;
+
+    const duration = (performance.now() - bootStartTime).toFixed(1);
+    const preloader = document.getElementById("preloader");
+    if (preloader) {
+      console.log(`%c[Preloader Diagnostics]
+- Источник скрытия: ${source}
+- Время до полного скрытия preloader: ${duration}мс`, "color: #06a658; font-weight: bold;");
+      preloader.classList.add("fade-out");
+      setTimeout(() => {
+        preloader.classList.add("hidden");
+      }, 500);
+    }
+  }
+
+  // ---- ЗАЩИТА И ЛОГИКА ЗАПУСКА ----
+  let connectionAttempts = 0;
+  let isInitializing = false;
+  let statusUpdateTimer1 = null;
+  let statusUpdateTimer2 = null;
+  let retryTimer = null;
+  let initAbortController = null;
+  const RETRY_INTERVALS = [0, 2000, 5000, 10000, 20000, 30000];
+
+  async function initializeApp() {
+    if (isInitializing) return;
+    
+    // Очистка предыдущих процессов
+    if (initAbortController) initAbortController.abort('New initialization');
+    clearTimeout(statusUpdateTimer1);
+    clearTimeout(statusUpdateTimer2);
+    clearTimeout(retryTimer);
+    
+    initAbortController = new AbortController();
+    isInitializing = true;
+    isPreloaderHidden = false;
+
+    // Сбрасываем статус
+    const statusMsg = document.getElementById("loadingStatus");
+    if (statusMsg) statusMsg.textContent = "";
+
+    // Таймеры для сообщений
+    statusUpdateTimer1 = setTimeout(() => {
+      if (statusMsg) statusMsg.textContent = "Подключаемся к серверу и проверяем актуальность данных...";
+    }, 10000);
+
+    statusUpdateTimer2 = setTimeout(() => {
+      if (statusMsg) statusMsg.textContent = "Подключение занимает больше времени, чем обычно. Проверьте подключение к интернету или попробуйте открыть сайт позже.";
+    }, 30000);
+
+    try {
+      console.log(`[Loader] Попытка подключения №${connectionAttempts + 1}`);
+
+      // 1. Загрузка статического конфига
+      const configRes = await fetch("config.json?v=" + Date.now(), { signal: initAbortController.signal });
+      if (!configRes.ok) throw new Error(`Ошибка загрузки конфига: ${configRes.status}`);
+      
+      const serverConfig = await configRes.json();
+      config = { ...config, ...serverConfig };
+      
+      useMock = !config.supabaseUrl || config.supabaseUrl === "https://your-project-id.supabase.co";
+
+      if (!useMock) {
+        supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+      }
+
+      // 2. Получение и сравнение хеша
+      let serverHash = null;
+
+      if (!useMock && supabase) {
+        // Запрос с таймаутом
+        const fetchHashPromise = supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "configHash")
+          .maybeSingle();
+
+        // Простой таймаут для supabase
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Hash check timeout')), 5000));
+        
+        const { data, error } = await Promise.race([
+          fetchHashPromise.then(res => ({ data: res.data, error: res.error })),
+          timeoutPromise
+        ]);
+        
+        if (error) throw error;
+        serverHash = data ? data.value : null;
+      }
+
+      // Очистка таймеров
+      clearTimeout(statusUpdateTimer1);
+      clearTimeout(statusUpdateTimer2);
+
+      // 3. Логика запуска
+      if (hasLocalCache && serverHash && serverHash === localHash) {
+        console.log("%c[Cache System] Хэши совпадают. Быстрый запуск.", "color: #06a658; font-weight: bold;");
+        applyCache();
+        hidePreloader("cache_hash_match");
+        connectionAttempts = 0;
+      } 
+      else {
+        console.log("%c[Cache System] Требуется полная загрузка.", "color: #ff9f43; font-weight: bold;");
+        await fullLoad(serverHash);
+        connectionAttempts = 0;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log("[Loader] Инициализация была прервана.");
+        return;
+      }
+      
+      clearTimeout(statusUpdateTimer1);
+      clearTimeout(statusUpdateTimer2);
+      
+      connectionAttempts++;
+      const delayIndex = Math.min(connectionAttempts, RETRY_INTERVALS.length - 1);
+      const nextRetry = RETRY_INTERVALS[delayIndex];
+      
+      console.warn(`[Loader] Ошибка (попытка ${connectionAttempts}), след. через ${nextRetry}мс:`, err.message);
+      
+      retryTimer = setTimeout(initializeApp, nextRetry);
+    } finally {
+      isInitializing = false;
+    }
+  }
+
+  // События сети
+  window.addEventListener("online", () => initializeApp());
+
+  // Вспомогательная функция полной загрузки
+  async function fullLoad(forcedHash = null) {
+      await loadSettings();
+      await loadPrizes();
+      
+      const newHash = forcedHash || calculateConfigHash(config.drawDate, config.heroTitle, config.heroSubtitle, config.minPurchaseAmount, config.prizes);
+      config.configHash = newHash;
+      
+      updateDynamicDateTexts();
+      initDatePicker();
+      checkRegistrationPeriod();
+      saveToCache(newHash);
+      hidePreloader("network_success");
+  }
+
+  // Сразу запускаем
+  initializeApp();
 
   // Определение даты розыгрыша (миллисекунды)
   function getTargetDrawTime() {
@@ -1122,8 +1281,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const sortedWinners = [...data].sort((a, b) => {
-        const pA = parseInt(a.prize, 10) || 999;
-        const pB = parseInt(b.prize, 10) || 999;
+        const getPrizeNumHelper = (val) => {
+          if (val === undefined || val === null) return 999;
+          const match = String(val).match(/\d+/);
+          return match ? parseInt(match[0], 10) : parseInt(val, 10) || 999;
+        };
+        const pA = getPrizeNumHelper(a.prize);
+        const pB = getPrizeNumHelper(b.prize);
         return pA - pB;
       });
 
@@ -1340,13 +1504,87 @@ document.addEventListener("DOMContentLoaded", async () => {
     const loadMoreBtn = document.getElementById("loadMoreBtn");
     if (loadMoreBtn) loadMoreBtn.classList.add("hidden");
 
-    if (!items || items.length === 0) {
+    // Вспомогательная функция для получения числового значения приза участника
+    const getPrizeNumber = (receipt) => {
+      const found = winners.find(w => cleanR(w.receipt) === cleanR(receipt));
+      if (found && found.prize !== undefined && found.prize !== null) {
+        // Извлекаем только числовые последовательности из номера приза, например "Подвеска №23" -> 23
+        const match = String(found.prize).match(/\d+/);
+        return match ? parseInt(match[0], 10) : parseInt(found.prize, 10) || 0;
+      }
+      return null;
+    };
+
+    // 1. Фильтруем items, выделяя тех, кто точно НЕ является победителем
+    const queryNonWinners = (items || []).filter(p => {
+      const isWin = p.won || winners.some(w => cleanR(w.receipt) === cleanR(p.receipt));
+      return !isWin;
+    });
+
+    // 2. Коллекционируем победителей, которых нужно показать на текущей странице / состоянии
+    let winnersToRender = [];
+
+    if (adminSearchQuery) {
+      // При наличии поиска показываем только тех победителей из глобального списка, которые соответствуют поисковому запросу
+      const sq = adminSearchQuery.toLowerCase();
+      winnersToRender = winners.filter(w => 
+        String(w.name || "").toLowerCase().includes(sq) ||
+        String(w.receipt || "").toLowerCase().includes(sq) ||
+        String(w.phone || "").toLowerCase().includes(sq)
+      );
+    } else if (adminCurrentPage === 1) {
+      // Если это Page 1 и нет фильтра - показываем ВСЕХ глобальных победителей
+      winnersToRender = [...winners];
+    }
+
+    // Сортируем победителей глобально по номеру приза по возрастанию
+    winnersToRender.sort((a, b) => {
+      const numA = getPrizeNumber(a.receipt) ?? 999;
+      const numB = getPrizeNumber(b.receipt) ?? 999;
+      return numA - numB;
+    });
+
+    // Строим итоговый список элементов для отрисовки на странице
+    // Сначала победители в глобальном отсортированном порядке, затем не-победители текущей страницы
+    const displayItems = [];
+    const processedReceipts = new Set();
+    
+    // Добавляем победителей
+    winnersToRender.forEach(w => {
+      const rClean = cleanR(w.receipt);
+      if (processedReceipts.has(rClean)) return;
+      processedReceipts.add(rClean);
+
+      // Ищем исходного участника среди items, чтобы подтянуть amount или checkTime, если они есть
+      const orig = (items || []).find(p => cleanR(p.receipt) === rClean);
+      displayItems.push({
+        receipt: w.receipt,
+        name: w.name || (orig ? orig.name : "Участник"),
+        phone: w.phone || (orig ? orig.phone : "—"),
+        checkTime: orig ? orig.checkTime : undefined,
+        amount: orig ? orig.amount : undefined,
+        date: w.date || (orig ? orig.date : undefined),
+        won: true,
+        bgWinner: true
+      });
+    });
+
+    // Теперь добавляем обычных участников текущей страницы
+    queryNonWinners.forEach(p => {
+      const rClean = cleanR(p.receipt);
+      if (processedReceipts.has(rClean)) return; // Избегаем дублирования
+      processedReceipts.add(rClean);
+      displayItems.push(p);
+    });
+
+    if (displayItems.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted, #888); padding: 40px;">Ничего не найдено</td></tr>';
       return;
     }
 
-    // Данные уже отсортированы на сервере: победители сверху, далее по дате
-    items.forEach((p) => {
+    const sortedItems = displayItems;
+
+    sortedItems.forEach((p) => {
       const tr = document.createElement("tr");
 
       const found = winners.find(
@@ -2281,18 +2519,106 @@ ${badgeHtml}
       const hour = match[4] ? parseInt(match[4], 10) : 0;
       const min = match[5] ? parseInt(match[5], 10) : 0;
       const sec = match[6] ? parseInt(match[6], 10) : 0;
-      const date = new Date(year, month, day, hour, min, sec);
-      if (!isNaN(date.getTime())) {
-        const pad = (num) => String(num).padStart(2, "0");
-        return `${year}-${pad(month + 1)}-${pad(day)}T${pad(hour)}:${pad(min)}:${pad(sec)}`;
-      }
-    }
-
-    const fallback = new Date(str);
-    if (!isNaN(fallback.getTime())) {
-      return fallback.toISOString();
+      return new Date(year, month, day, hour, min, sec).toISOString();
     }
     return null;
+  }
+
+  // Сохранение настроек акции
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener("click", async () => {
+      const msg = document.getElementById("settingsMessage");
+      const startVal = document.getElementById("adminStartDate").value;
+      const endVal = document.getElementById("adminEndDate").value;
+      const drawVal = document.getElementById("adminDrawDate").value;
+
+      if (!startVal || !endVal || !drawVal) {
+        msg.textContent = "Пожалуйста, заполните все поля.";
+        msg.className = "message error";
+        return;
+      }
+
+      const parsedStart = parseUserDate(startVal);
+      const parsedEnd = parseUserDate(endVal);
+      const parsedDraw = parseUserDate(drawVal);
+
+      if (!parsedStart || !parsedEnd || !parsedDraw) {
+        msg.textContent =
+          "Неверный формат даты. Пожалуйста, используйте формат: ДД.ММ.ГГГГ ЧЧ:ММ (например: 30.06.2026 23:59)";
+        msg.className = "message error";
+        return;
+      }
+
+      saveSettingsBtn.disabled = true;
+      saveSettingsBtn.textContent = "Сохранение...";
+      msg.textContent = "";
+      msg.className = "message";
+
+      const isDrawDateChanged = config.drawDate !== parsedDraw;
+
+      const newSettings = {
+        startDate: parsedStart,
+        endDate: parsedEnd,
+        drawDate: parsedDraw,
+        registrationEnabled: config.registrationEnabled !== false,
+        winnersPublished: document.getElementById("publishWinners").checked,
+        configHash: config.configHash || ""
+      };
+
+      try {
+        if (useMock || !supabase) {
+          await new Promise((r) => setTimeout(r, 600));
+          if (isDrawDateChanged) {
+            config.drawDate = parsedDraw;
+            await recalculateAndSaveConfigHash();
+            newSettings.configHash = config.configHash;
+          }
+          localStorage.setItem("lottery_settings", JSON.stringify(newSettings));
+          config = { ...config, ...newSettings };
+          msg.textContent = "Настройки успешно сохранены локально в демо-режиме.";
+          msg.className = "message success";
+        } else {
+          if (isDrawDateChanged) {
+            config.drawDate = parsedDraw;
+            await recalculateAndSaveConfigHash();
+            newSettings.configHash = config.configHash;
+          }
+          const upsertSettings = [
+            { key: "startDate", value: parsedStart },
+            { key: "endDate", value: parsedEnd },
+            { key: "drawDate", value: parsedDraw },
+            { key: "registrationEnabled", value: String(newSettings.registrationEnabled) },
+            { key: "winnersPublished", value: String(newSettings.winnersPublished) }
+          ];
+          const { error } = await supabase.from("settings").upsert(upsertSettings);
+          if (error) throw error;
+          
+          await supabase.from("logs").insert({
+            action: "SAVE_SETTINGS",
+            admin_user: authEmail(),
+            created_at: new Date().toISOString()
+          }).select().maybeSingle();
+          
+          config = { ...config, ...newSettings };
+          msg.textContent = "Настройки успешно сохранены.";
+          msg.className = "message success";
+        }
+        
+        updateDynamicDateTexts();
+        initDatePicker();
+        checkRegistrationPeriod();
+        fillSettingsInputs();
+        saveToCache();
+      } catch (err) {
+        console.error("Ошибка при сохранении настроек:", err);
+        msg.textContent = "Произошла ошибка связи с сервером.";
+        msg.className = "message error";
+      } finally {
+        saveSettingsBtn.disabled = false;
+        saveSettingsBtn.textContent = "Сохранить настройки";
+      }
+    });
   }
 
   if (tabParticipants && tabSettings && tabSiteSettings) {
@@ -2387,89 +2713,36 @@ ${badgeHtml}
     });
   }
 
-  // Сохранение настроек акции
-  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-  if (saveSettingsBtn) {
-    saveSettingsBtn.addEventListener("click", async () => {
-      const msg = document.getElementById("settingsMessage");
-      const startVal = document.getElementById("adminStartDate").value;
-      const endVal = document.getElementById("adminEndDate").value;
-      const drawVal = document.getElementById("adminDrawDate").value;
-
-      if (!startVal || !endVal || !drawVal) {
-        msg.textContent = "Пожалуйста, заполните все поля.";
-        msg.className = "message error";
-        return;
-      }
-
-      const parsedStart = parseUserDate(startVal);
-      const parsedEnd = parseUserDate(endVal);
-      const parsedDraw = parseUserDate(drawVal);
-
-      if (!parsedStart || !parsedEnd || !parsedDraw) {
-        msg.textContent =
-          "Неверный формат даты. Пожалуйста, используйте формат: ДД.ММ.ГГГГ ЧЧ:ММ (например: 30.06.2026 23:59)";
-        msg.className = "message error";
-        return;
-      }
-
-      saveSettingsBtn.disabled = true;
-      saveSettingsBtn.textContent = "Сохранение...";
-      msg.textContent = "";
-      msg.className = "message";
-
-      const newSettings = {
-        startDate: parsedStart,
-        endDate: parsedEnd,
-        drawDate: parsedDraw,
-        registrationEnabled: config.registrationEnabled !== false,
-        winnersPublished: document.getElementById("publishWinners").checked,
-      };
-
-      try {
-        if (useMock || !supabase) {
-          await new Promise((r) => setTimeout(r, 600));
-          localStorage.setItem("lottery_settings", JSON.stringify(newSettings));
-          config = { ...config, ...newSettings };
-          msg.textContent = "Настройки успешно сохранены локально в демо-режиме.";
-          msg.className = "message success";
-        } else {
-          const upsertSettings = [
-            { key: "startDate", value: parsedStart },
-            { key: "endDate", value: parsedEnd },
-            { key: "drawDate", value: parsedDraw },
-            { key: "registrationEnabled", value: String(newSettings.registrationEnabled) },
-            { key: "winnersPublished", value: String(newSettings.winnersPublished) }
-          ];
-          const { error } = await supabase.from("settings").upsert(upsertSettings);
-          if (error) throw error;
-          
-          await supabase.from("logs").insert({
-            action: "SAVE_SETTINGS",
-            admin_user: authEmail(),
-            created_at: new Date().toISOString()
-          }).select().maybeSingle();
-          
-          config = { ...config, ...newSettings };
-          msg.textContent = "Настройки успешно сохранены.";
-          msg.className = "message success";
-        }
-        
-        updateDynamicDateTexts();
-        initDatePicker();
-        checkRegistrationPeriod();
-        fillSettingsInputs();
-        saveToCache();
-      } catch (err) {
-        console.error("Ошибка при сохранении настроек:", err);
-        msg.textContent = "Произошла ошибка связи с сервером.";
-        msg.className = "message error";
-      } finally {
-        saveSettingsBtn.disabled = false;
-        saveSettingsBtn.textContent = "Сохранить настройки";
-      }
-    });
+  // Вспомогательная функция для автоматического сохранения обновленного хэша в бэкенд
+  async function recalculateAndSaveConfigHash() {
+    const nextHash = calculateConfigHash(
+      config.drawDate,
+      config.heroTitle,
+      config.heroSubtitle,
+      config.minPurchaseAmount,
+      config.prizes
+    );
+    config.configHash = nextHash;
+    
+    if (useMock || !supabase) {
+      console.log(`%c[Config Hashing] (Demo) Локальный расчет хэша первого экрана: ${nextHash}`, "color: #00bcd4; font-weight: bold;");
+      return nextHash;
+    }
+    
+    try {
+      const { error } = await supabase.from("settings").upsert({
+        key: "configHash",
+        value: nextHash
+      });
+      if (error) throw error;
+      console.log(`%c[Config Hashing] Хэш конфигурации сохранен в Supabase: ${nextHash}`, "color: #00bcd4; font-weight: bold;");
+      return nextHash;
+    } catch (err) {
+      console.error("Ошибка при сохранении хэша конфигурации в Supabase:", err);
+      return nextHash;
+    }
   }
+
 
   function updateFrontEndPrizesUI(prizes) {
     const grid = document.querySelector(".prizes-grid");
@@ -2565,6 +2838,7 @@ ${badgeHtml}
           config.heroTitle = titleVal;
           config.heroSubtitle = subtitleVal;
           config.prizes = newPrizes;
+          await recalculateAndSaveConfigHash();
           
           localStorage.setItem("lottery_settings", JSON.stringify({
             startDate: config.startDate,
@@ -2574,7 +2848,8 @@ ${badgeHtml}
             winnersPublished: config.winnersPublished,
             minPurchaseAmount: config.minPurchaseAmount,
             heroTitle: titleVal,
-            heroSubtitle: subtitleVal
+            heroSubtitle: subtitleVal,
+            configHash: config.configHash
           }));
           
           localStorage.setItem("lottery_prizes", JSON.stringify(newPrizes));
@@ -2610,6 +2885,8 @@ ${badgeHtml}
           config.heroTitle = titleVal;
           config.heroSubtitle = subtitleVal;
           config.prizes = newPrizes;
+
+          await recalculateAndSaveConfigHash();
 
           msg.textContent = "Настройки сайта изменены в базе данных.";
           msg.className = "message success";
@@ -2659,10 +2936,13 @@ ${badgeHtml}
       msg.style.display = "none";
       msg.className = "message";
 
+      const parsedAmount = parseFloat(minAmountVal);
+
       try {
         if (useMock || !supabase) {
           await new Promise(r => setTimeout(r, 600));
-          config.minPurchaseAmount = parseFloat(minAmountVal);
+          config.minPurchaseAmount = parsedAmount;
+          await recalculateAndSaveConfigHash();
           
           localStorage.setItem("lottery_settings", JSON.stringify({
             startDate: config.startDate,
@@ -2672,7 +2952,8 @@ ${badgeHtml}
             winnersPublished: config.winnersPublished,
             minPurchaseAmount: minAmountVal,
             heroTitle: config.heroTitle,
-            heroSubtitle: config.heroSubtitle
+            heroSubtitle: config.heroSubtitle,
+            configHash: config.configHash
           }));
 
           msg.textContent = "Минимальная сумма покупки сохранена локально.";
@@ -2690,7 +2971,9 @@ ${badgeHtml}
             created_at: new Date().toISOString()
           }).select().maybeSingle();
           
-          config.minPurchaseAmount = parseFloat(minAmountVal);
+          config.minPurchaseAmount = parsedAmount;
+          await recalculateAndSaveConfigHash();
+          
           msg.textContent = "Сумма успешно сохранена в базе данных.";
           msg.className = "message success";
           msg.style.display = "block";
