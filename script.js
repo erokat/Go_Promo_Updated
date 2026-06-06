@@ -290,6 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Флаг, предотвращающий повторные или преждевременные скрытия прелоадера
   let isPreloaderHidden = false;
+  let isHidePending = false;
 
   // Считываем локальный кэш заранее для оценки версии
   let hasLocalCache = false;
@@ -310,7 +311,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Скрываем прелоадер
   function hidePreloader(source = "normal") {
-    if (isPreloaderHidden) return;
+    if (isPreloaderHidden || isHidePending) return;
+
+    const elapsed = performance.now() - bootStartTime;
+    if (elapsed < 1000) {
+      isHidePending = true;
+      setTimeout(() => {
+        isHidePending = false;
+        hidePreloader(source);
+      }, 1000 - elapsed);
+      return;
+    }
+
     isPreloaderHidden = true;
 
     const duration = (performance.now() - bootStartTime).toFixed(1);
