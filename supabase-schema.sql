@@ -63,14 +63,21 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
 CREATE INDEX IF NOT EXISTS idx_participants_phone ON public.participants(phone);
 CREATE INDEX IF NOT EXISTS idx_participants_date_desc ON public.participants(date DESC);
 
+-- Оптимизация полнотекстового поиска в админке
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS trgm_idx_participants_name ON public.participants USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS trgm_idx_participants_phone ON public.participants USING GIN (phone gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS trgm_idx_participants_receipt ON public.participants USING GIN (receipt gin_trgm_ops);
+
 -- Частичный индекс для мгновенного Index-Only Scan при проверке неразыгранных записей
 CREATE INDEX IF NOT EXISTS idx_participants_eligible ON public.participants(receipt) WHERE won = false;
 
 -- Высокопроизводительный функциональный индекс для мгновенного розыгрыша O(log N) на основе криптографического хэша
 CREATE INDEX IF NOT EXISTS idx_participants_md5 ON public.participants (md5(receipt)) WHERE won = false;
 
--- Составной индекс для листинга и фильтрации победителей
-CREATE INDEX IF NOT EXISTS idx_participants_won_date_desc ON public.participants(won, date DESC);
+-- Составной индекс, в ТОЧНОСТИ совпадающий с сортировкой в админ панели: .order("won", { ascending: false }).order("date", { ascending: false }).order("receipt", { ascending: true })
+DROP INDEX IF EXISTS idx_participants_won_date_desc;
+CREATE INDEX IF NOT EXISTS idx_participants_pagination ON public.participants(won DESC, date DESC, receipt ASC);
 
 -- Индексы для таблицы победителей
 CREATE INDEX IF NOT EXISTS idx_winners_prize ON public.winners(prize);
@@ -308,7 +315,7 @@ DECLARE
     winner_record RECORD;
     prize_idx INT := NULL;
     drawn_prize_name TEXT;
-    total_prizes INT := 10; -- Ровно 10 призов
+    total_prizes INT;
     used_prizes INT[];
     total_eligible INT;
     random_hash TEXT;
@@ -320,13 +327,21 @@ BEGIN
         RAISE EXCEPTION 'Недостаточно прав для проведения розыгрыша';
     END IF;
 
+    -- Определяем текущее количество призов в базе
+    SELECT COUNT(*) INTO total_prizes FROM public.prizes;
+
+    -- Если призы не заведены, fallback к 10 (или можно кидать ошибку, но оставим 10 для старых демо)
+    IF total_prizes = 0 THEN
+        total_prizes := 10;
+    END IF;
+
     -- 2. ЭКСКЛЮЗИВНАЯ БЛОКИРОВКА таблицы winners для 100% защиты от Race Conditions и двойного выбора призов
     LOCK TABLE public.winners IN EXCLUSIVE MODE;
 
     -- 3. Получение списка уже зарегистрированных призовых мест
     SELECT COALESCE(array_agg(prize), '{}'::integer[]) INTO used_prizes FROM public.winners;
 
-    -- 4. Поиск первого доступного свободного приза по направления убывания (10 -> 1)
+    -- 4. Поиск первого доступного свободного приза по направления убывания (N -> 1)
     FOR i IN REVERSE total_prizes..1 LOOP
         IF NOT (i = ANY(used_prizes)) THEN
             prize_idx := i;
@@ -552,10 +567,18 @@ BEGIN
     -- 4. Удаляем сам приз
     DELETE FROM public.prizes WHERE id = prize_idx_to_delete;
 
-    -- 5. Сдвигаем все призы id > prize_idx_to_delete на 1 вверх (id - 1)
-    UPDATE public.prizes
-    SET id = id - 1
-    WHERE id > prize_idx_to_delete;
+    -- 5. Сдвигаем все призы id > prize_idx_to_delete на 1 вверх (id - 1) безопасным способом
+    -- Использование простого UPDATE может привести к ошибкам duplicate key, если PostgreSQL 
+    -- начнет изменять строки в недетерминированном физическом порядке.
+    FOR r IN (
+        SELECT id FROM public.prizes 
+        WHERE id > prize_idx_to_delete 
+        ORDER BY id ASC
+    ) LOOP
+        UPDATE public.prizes
+        SET id = r.id - 1
+        WHERE id = r.id;
+    END LOOP;
 
     -- 6. Перенумеровываем победителей в winners таблице
     -- Сдвигаем prize на 1 вверх (prize - 1) для всех prize > prize_idx_to_delete.

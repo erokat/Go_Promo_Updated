@@ -158,6 +158,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+
+
   // 1. Инициализация (Загрузка конфигурации)
   try {
     const fetchUrl = "config.json?v=" + Date.now();
@@ -263,7 +265,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (now > end) {
       regAlert.style.display = "block";
-      regAlert.textContent = "Период регистрации чеков завершен!";
+      const dateStr = formatDateRu(end, true);
+      regAlert.textContent = `Период регистрации чеков завершен ${dateStr}`;
       submitBtn.disabled = true;
       submitBtn.textContent = "РЕГИСТРАЦИЯ ЗАВЕРШЕНА";
       return false;
@@ -982,6 +985,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getDynamicPrizes() {
+    if (config && config.prizes && config.prizes.length > 0) {
+      return config.prizes.map((p, i) => `${i + 1}. ${p.name}`);
+    }
     const cards = document.querySelectorAll(".prizes-grid .prize-card");
     if (cards.length > 0) {
       return Array.from(cards).map((card, i) => {
@@ -996,27 +1002,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       "3. Видеорегистратор HOCO DV8 with rear camera",
       "4. Наушники Baseus Bluetooth BH1 NC Black",
       "5. Часы Xiaomi Redmi Watch 5 Active",
-      "6. Колонка Blackview Bluetooth Aurabass 3",
+      "6. Колонка Blackview Bluetooth Aurabass 3 16W",
       "7. Весы Xiaomi Mi Body Composition Scale S400",
-      "8. Наушники Redmi Buds 6 Play",
+      "8. Наушники Xiaomi Bluetooth Redmi Buds 6 Play",
       "9. Ночник Cute Panda",
       "10. Наушники Xiaomi Headphones Basic",
     ];
   }
 
   function resolvePrizeName(prizeValue, winnerObj) {
-    if (winnerObj && winnerObj.prize_name) {
-      return `${winnerObj.prize}. ${winnerObj.prize_name}`;
-    }
     if (!prizeValue) return "";
-    const num = parseInt(prizeValue, 10);
+    
+    // Получаем текущие динамические призы из конфигурации
     const prizesList = getDynamicPrizes();
+    
+    // Пытаемся найти по числовому ID
+    const num = parseInt(prizeValue, 10);
     if (!isNaN(num) && num >= 1 && num <= prizesList.length) {
-      return prizesList[num - 1];
+      return prizesList[num - 1]; // Возвращаем актуальное название приза
     }
+    
+    // Иначе пытаемся найти по названию
     const str = String(prizeValue).trim();
     const matched = prizesList.find(p => p === str || p.replace(/^\d+\.\s+/, "") === str);
     if (matched) return matched;
+    
     return str;
   }
 
@@ -1062,9 +1072,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         // Запрос победителей из Supabase. 
         // Если победители не опубликованы, RLS заблокирует для публики (но админа авторизует!)
+        let selectFields = "receipt, name, prize, prize_name, date";
+        if (isAdmin) selectFields += ", phone";
+
         const { data: selectWinners, error } = await supabase
           .from("winners")
-          .select("receipt, name, phone, prize, prize_name, date")
+          .select(selectFields)
           .order("prize", { ascending: true });
 
         if (error) {
@@ -1160,8 +1173,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         .select("receipt, name, phone, check_time, amount, date, won", { count: 'exact' });
 
       if (searchQuery) {
-        // Поиск по ФИО, телефону или чеку
-        query = query.or(`name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,receipt.ilike.%${searchQuery}%`);
+        // Поиск по ФИО, телефону или чеку с безопасным экранированием для PostgREST
+        const sq = searchQuery.replace(/"/g, ''); 
+        query = query.or(`name.ilike."%${sq}%",phone.ilike."%${sq}%",receipt.ilike."%${sq}%"`);
       }
 
       // Пагинация
@@ -1169,7 +1183,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const to = from + adminPageSize - 1;
       
       const { data, count, error } = await query
+        .order("won", { ascending: false })
         .order("date", { ascending: false })
+        .order("receipt", { ascending: true })
         .range(from, to);
 
       if (error) throw error;
@@ -1225,62 +1241,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Экспорт победителей в CSV
 
-
-  function convertToCsv(objArray, headers) {
-    const array = typeof objArray !== 'object' ? JSON.parse(objArray) : objArray;
-    let str = '\uFEFF'; // Добавляем BOM для корректной кодировки кириллицы в Excel
-    
-    // Заголовок
-    str += headers.map(h => {
-      // Сделаем красивые заголовки для Excel
-      if (h === "receipt") return "Чек";
-      if (h === "name") return "ФИО";
-      if (h === "phone") return "Телефон";
-      if (h === "check_time") return "Время чека";
-      if (h === "amount") return "Сумма";
-      if (h === "date") return "Дата регистрации";
-      if (h === "won") return "Призер";
-      if (h === "prize") return "Номер приза";
-      if (h === "prize_name") return "Название приза";
-      return h;
-    }).join(",") + "\r\n";
-    
-    for (let i = 0; i < array.length; i++) {
-      let line = '';
-      for (let index = 0; index < headers.length; index++) {
-        if (line !== '') line += ',';
-        
-        let val = array[i][headers[index]];
-        if (val === undefined || val === null) {
-          val = "";
-        } else {
-          val = String(val).replace(/"/g, '""'); // Экранируем кавычки
-          if (val.search(/([",\n])/g) >= 0) {
-            val = '"' + val + '"';
-          }
-        }
-        line += val;
-      }
-      str += line + "\r\n";
-    }
-    return str;
-  }
-
-  function downloadFile(content, fileName, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    }, 0);
-  }
 
   function renderAdminStats() {
     const totalPartEl = document.getElementById("statTotalParticipants");
@@ -1356,25 +1317,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // Сортировка на клиенте в пределах ТЕКУЩЕЙ страницы: победители поднимаются наверх
-    const sorted = [...items].sort((a, b) => {
-      const aWinner = winners.find((w) => cleanR(w.receipt) === cleanR(a.receipt));
-      const bWinner = winners.find((w) => cleanR(w.receipt) === cleanR(b.receipt));
-      const aIsWinner = !!aWinner || !!a.won;
-      const bIsWinner = !!bWinner || !!b.won;
-
-      if (aIsWinner && !bIsWinner) return -1;
-      if (!aIsWinner && bIsWinner) return 1;
-      
-      if (aIsWinner && bIsWinner) {
-        const prizeA = aWinner && !isNaN(parseInt(aWinner.prize, 10)) ? parseInt(aWinner.prize, 10) : 999;
-        const prizeB = bWinner && !isNaN(parseInt(bWinner.prize, 10)) ? parseInt(bWinner.prize, 10) : 999;
-        return prizeA - prizeB;
-      }
-      return 0;
-    });
-
-    sorted.forEach((p) => {
+    // Данные уже отсортированы на сервере: победители сверху, далее по дате
+    items.forEach((p) => {
       const tr = document.createElement("tr");
 
       const found = winners.find(
@@ -1583,7 +1527,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     msg.style.opacity = "1";
     msg.style.transition = "";
-    msg.className = "message info";
+    msg.className = "message";
     msg.textContent = "";
 
     function showWinnerMessage(w) {
@@ -1610,11 +1554,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!useMock && supabase) {
       btn.disabled = true;
-      msg.className = "message info";
-      msg.style.opacity = "1";
 
-      let candidates = participants.filter((p) => !p.won);
-      
+      let candidates = [];
       const { data } = await supabase.from('participants').select('receipt, name').eq('won', false).limit(30);
       if (data && data.length > 0) candidates = data;
 
@@ -1624,6 +1565,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.disabled = false;
         return;
       }
+      
+      msg.className = "message info";
+      msg.style.opacity = "1";
 
       let spinInterval;
 
@@ -2160,8 +2104,6 @@ ${badgeHtml}
             let pObj = participants.find((p) => p.receipt === winnerForPrize.receipt);
             if (pObj) pObj.won = false;
             currentWinnersCount = winners.length;
-            localStorage.setItem("lottery_participants", JSON.stringify(participants));
-            localStorage.setItem("lottery_winners", JSON.stringify(winners));
           }
 
           localPrizes.splice(deleteIndex, 1);
@@ -2188,7 +2130,6 @@ ${badgeHtml}
 
           config.prizes = newSyncPrizes;
           localStorage.setItem("lottery_prizes", JSON.stringify(newSyncPrizes));
-          localStorage.setItem("lottery_winners", JSON.stringify(winners));
           renderAdminPrizes();
         }
 
@@ -2529,9 +2470,11 @@ ${badgeHtml}
   }
 
   // Сохранение настроек сайта
+  let siteSettingsTimeout = null;
   const saveSiteSettingsBtn = document.getElementById("saveSiteSettingsBtn");
   if (saveSiteSettingsBtn) {
     saveSiteSettingsBtn.addEventListener("click", async () => {
+      if (siteSettingsTimeout) clearTimeout(siteSettingsTimeout);
       const msg = document.getElementById("siteSettingsMessage");
       const titleVal = document.getElementById("adminSiteTitle").value.trim();
       const subtitleVal = document.getElementById("adminSiteSubtitle").value.trim();
@@ -2609,6 +2552,10 @@ ${badgeHtml}
 
           msg.textContent = "Настройки сайта изменены локально в браузере (демо-режим).";
           msg.className = "message success";
+          siteSettingsTimeout = setTimeout(() => {
+            msg.textContent = "";
+            msg.className = "message";
+          }, 5000);
         } else {
           const upsertSettings = [
             { key: "heroTitle", value: titleVal },
@@ -2637,6 +2584,10 @@ ${badgeHtml}
 
           msg.textContent = "Настройки сайта изменены в базе данных.";
           msg.className = "message success";
+          siteSettingsTimeout = setTimeout(() => {
+            msg.textContent = "";
+            msg.className = "message";
+          }, 5000);
         }
 
         const titleEl = document.getElementById("hero-title");
