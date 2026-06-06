@@ -2738,8 +2738,8 @@ ${badgeHtml}
       console.log(`%c[Config Hashing] Хэш конфигурации сохранен в Supabase: ${nextHash}`, "color: #00bcd4; font-weight: bold;");
       return nextHash;
     } catch (err) {
-      console.error("Ошибка при сохранении хэша конфигурации в Supabase:", err);
-      return nextHash;
+      console.error("[Config Hashing] Критическая ошибка при сохранении хэша:", err);
+      throw err;
     }
   }
 
