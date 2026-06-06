@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let config = {};
   let participants = []; // Локальная база для демо-режима и кэш для админки
   let winners = []; // Локальные победители для демо-режима и кэш для отображения
+  let winnersLoaded = false; // Отложенная загрузка участников (оптимизация FCP/LCP)
   let localPrizes = []; // Редактируемые призы во вкладке настроек
   let isAdmin = false;
   let adminToken = null; // Токен авторизации (JWT)
@@ -664,7 +665,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Обновляем список победителей на главной
-    loadWinners();
+    loadWinners(true);
   });
 
   // Инициализация и авто-коррекция ввода номера телефона (8 цифр)
@@ -956,13 +957,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     return String(r).trim().replace(/^'/, "");
   };
 
-  async function loadWinners() {
+  async function loadWinners(force = false) {
     const list = document.getElementById("winnersList");
     if (!list) return;
+
+    // Избегаем повторной загрузки, если данные уже загружены и принудительный флаг не поднят
+    if (winnersLoaded && !force) return;
+
+    // Сразу ставим флаг, чтобы не дублировать параллельные запросы
+    winnersLoaded = true;
+
+    // Включаем скелетоны загрузки
+    list.classList.add("winners-fade-in");
+    list.classList.remove("loaded");
+    list.innerHTML = `
+      <div class="skeleton-card shimmer">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-name"></div>
+        <div class="skeleton-receipt"></div>
+      </div>
+      <div class="skeleton-card shimmer">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-name"></div>
+        <div class="skeleton-receipt"></div>
+      </div>
+      <div class="skeleton-card shimmer">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-name"></div>
+        <div class="skeleton-receipt"></div>
+      </div>
+    `;
 
     try {
       let data = [];
       if (useMock || !supabase) {
+        // Симулируем небольшую задержку сети в демо-режиме, чтобы показать shimmer
+        if (!force) {
+          await new Promise(r => setTimeout(r, 600));
+        }
         data = winners;
       } else {
         // Запрос победителей из Supabase. 
@@ -992,6 +1024,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (data.length === 0) {
         list.innerHTML =
           '<p style="grid-column: 1/-1; text-align:center; color:#777; font-size: 1.1rem;">Итоги подводятся, ожидайте публикации списков!</p>';
+        list.classList.add("loaded");
         return;
       }
 
@@ -1015,10 +1048,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         `;
         list.appendChild(card);
       });
+
+      // Плавное анимированное появление
+      setTimeout(() => {
+        list.classList.add("loaded");
+      }, 50);
+
     } catch (err) {
       console.error("Ошибка отображения победителей:", err);
       list.innerHTML =
         '<p class="error" style="grid-column: 1/-1;">Ошибка загрузки списка победителей.</p>';
+      list.classList.add("loaded");
     }
   }
 
@@ -1041,7 +1081,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (useMock || !supabase) {
-      await loadWinners();
+      await loadWinners(true);
       const mockFiltered = participants.filter((p) =>
         String(p.receipt || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         String(p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1060,7 +1100,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       // 1. Сначала загружаем победителей
-      await loadWinners().catch(err => console.error("Ошибка загрузки победителей:", err));
+      await loadWinners(true).catch(err => console.error("Ошибка загрузки победителей:", err));
 
       // 2. Строим запрос для участников
       let query = supabase
@@ -1505,7 +1545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (responseData && responseData.success) {
           showWinnerMessage(responseData.winner);
           await loadAdminData();
-          await loadWinners();
+          await loadWinners(true);
         } else {
           msg.textContent = (responseData && responseData.message) || "Ошибка розыгрыша";
           msg.className = "message error";
@@ -2582,6 +2622,54 @@ ${badgeHtml}
     });
   }
 
-  // Первоначальный вызов отрисовки открытой части
-  loadWinners();
+  // Ленивая загрузка победителей с использованием Intersection Observer
+  function setupWinnersLazyLoading() {
+    const list = document.getElementById("winnersList");
+    const promoForm = document.getElementById("promoForm");
+    const winnersSection = document.querySelector(".winners-section");
+
+    if (!list) return;
+
+    // Скелетон загрузки показываем изначально до начала загрузки
+    list.classList.add("winners-fade-in");
+    list.innerHTML = `
+      <div class="skeleton-card shimmer">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-name"></div>
+        <div class="skeleton-receipt"></div>
+      </div>
+      <div class="skeleton-card shimmer">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-name"></div>
+        <div class="skeleton-receipt"></div>
+      </div>
+      <div class="skeleton-card shimmer">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-name"></div>
+        <div class="skeleton-receipt"></div>
+      </div>
+    `;
+
+    if (typeof IntersectionObserver !== "undefined") {
+      const observer = new IntersectionObserver((entries) => {
+        const isIntersecting = entries.some(entry => entry.isIntersecting);
+        if (isIntersecting) {
+          console.log("Доскроллили до формы регистрации или блока победителей, загружаем результаты...");
+          loadWinners();
+          observer.disconnect();
+        }
+      }, {
+        rootMargin: "150px 0px" // Подгружаем на 150px раньше пересечения для максимально бесшовного эффекта
+      });
+
+      if (promoForm) observer.observe(promoForm);
+      if (winnersSection) observer.observe(winnersSection);
+    } else {
+      // Фолбэк для устаревших систем
+      loadWinners();
+    }
+  }
+
+  // Запуск ленивой оптимизированной загрузки
+  setupWinnersLazyLoading();
 });
