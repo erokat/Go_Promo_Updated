@@ -613,28 +613,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
 
         if (error) {
-          // Проверяем, есть ли администраторы в системе
-          let isFirstRun = false;
-          try {
-            const { data: count, error: countErr } = await supabase.rpc('get_admin_count');
-            if (!countErr && (count === 0 || count === null)) {
-              isFirstRun = true;
-            } else if (countErr) {
-              // Если возникла любая ошибка (например, функция СУБД get_admin_count не найдена),
-              // мы всё равно разрешаем отображение кнопки регистрации первого администратора
-              console.warn("RPC get_admin_count вернул ошибку:", countErr);
-              isFirstRun = true;
-            }
-          } catch (rpcErr) {
-            console.warn("Не удалось вызвать get_admin_count RPC:", rpcErr);
-            isFirstRun = true;
-          }
-
-          if (isFirstRun) {
-            showLoginError("Неверный логин/пароль. Похоже, в базе данных еще нет администраторов! Вы можете зарегистрировать этот аккаунт как первый администратор.", true);
-          } else {
-            throw new Error(error.message || "Неверный логин или пароль");
-          }
+          throw new Error("Неверный логин или пароль");
         } else {
           adminToken = data.session.access_token;
           adminUserEmail = (data.user && data.user.email) || "admin";
@@ -649,93 +628,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.textContent = "Вход";
     }
 
-    function showLoginError(text = "Неверный логин или пароль", isFirstTimeSetup = false) {
-      if (isFirstTimeSetup) {
-        msg.className = "message error";
-        msg.innerHTML = `
-          <div style="margin-bottom: 12px; font-weight: 500; font-size: 0.95rem;">${text}</div>
-          <button type="button" id="registerFirstAdminBtn" class="btn" style="background-color: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; text-shadow: 1px 1px 2px rgba(0,0,0,0.25);">
-            ⚡ Зарегистрировать как первого админа
-          </button>
-          <div style="font-size: 0.8rem; margin-top: 8px; opacity: 0.85; line-height: 1.3;">
-            При неудаче убедитесь, что в панели Supabase (<b>Auth -> Providers -> Email</b>) отключен параметр <b>"Confirm email"</b>, либо используйте реальную почту. Также убедитесь, что в вашей базе данных развернута последняя версия структуры из файла <code>supabase-schema.sql</code>.
-          </div>
-        `;
-        
-        const registerBtn = document.getElementById("registerFirstAdminBtn");
-        if (registerBtn) {
-          registerBtn.onclick = async () => {
-            msg.innerHTML = '<div class="loader-spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid #ccc; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></div>Регистрация первого администратора...';
-            try {
-              const email = `${user.toLowerCase().replace(/[^a-z0-9_.-]/g, "")}@go-promo.local`;
-              
-              // Пытаемся сначала зарегистрировать пользователя
-              const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email: email,
-                password: pass,
-              });
-
-              if (signUpError) {
-                // Если пользователь уже существует в Auth, возможно он просто не маппирован в таблицу admin_users!
-                if (signUpError.message && signUpError.message.includes("already registered")) {
-                  // Попытаемся войти с введенными данными
-                  const { data: logData, error: logError } = await supabase.auth.signInWithPassword({
-                    email: email,
-                    password: pass,
-                  });
-                  if (logError) {
-                    throw new Error("Пользователь уже зарегистрирован в Auth, но пароль не подходит или email не подтвержден.");
-                  }
-                  
-                  // Мы вошли в Auth, теперь попробуем прописать в admin_users через RPC
-                  const { data: rpcData, error: rpcError } = await supabase.rpc('initialize_first_admin', {
-                    admin_username: user
-                  });
-                  if (rpcError) throw rpcError;
-                  if (rpcData && rpcData.success === false) throw new Error(rpcData.message);
-                  
-                  adminToken = logData.session.access_token;
-                  proceedLogin();
-                  return;
-                }
-                throw signUpError;
-              }
-
-              // Пользователь успешно зарегистрирован в Auth. Проверяем, залогинены ли мы.
-              // В Supabase signUp авто-логинит при выключенном Confirm email.
-              // Если сессия не создана, предупредим пользователя.
-              const { data: { session } } = await supabase.auth.getSession();
-              if (!session) {
-                throw new Error("Регистрация успешна, но требуется подтверждение Email. Пожалуйста, отключите 'Confirm email' в настройках Supabase Auth.");
-              }
-
-              // Прописываем пользователя в таблицу admin_users через надежный RPC
-              const { data: rpcData, error: rpcError } = await supabase.rpc('initialize_first_admin', {
-                admin_username: user
-              });
-
-              if (rpcError) {
-                throw rpcError;
-              }
-
-              if (rpcData && rpcData.success === false) {
-                throw new Error(rpcData.message);
-              }
-
-              adminToken = session.access_token;
-              adminUserEmail = (session.user && session.user.email) || "admin";
-              proceedLogin();
-
-            } catch (regErr) {
-              console.warn("Предупреждение при авто-регистрации админа:", regErr);
-              showLoginError("Ошибка регистрации: " + (regErr.message || JSON.stringify(regErr)), true);
-            }
-          };
-        }
-      } else {
-        msg.textContent = text;
-        msg.className = "message error";
-      }
+    function showLoginError(text = "Неверный логин или пароль") {
+      msg.textContent = text;
+      msg.className = "message error";
     }
   });
 

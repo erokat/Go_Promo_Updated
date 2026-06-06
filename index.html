@@ -1075,7 +1075,12 @@
               </ul>
             </li>
             <li>
-              Чтобы зарегистрировать администратора, перейдите в раздел <b>Authentication -> Users -> Add user</b>, выберите <b>Create user</b>, введите Email (например, <code>admin@go-promo.local</code>) и пароль. Нажмите кнопку создания — триггер СУБД автоматически создаст профиль в таблице администраторов!
+              Чтобы зарегистрировать администратора, перейдите в раздел <b>Authentication -> Users -> Add user</b>, выберите <b>Create user</b>, введите Email (например, <code>admin@go-promo.local</code>) и пароль. Нажмите кнопку создания — триггер СУБД автоматически создаст профиль в таблице администраторов! 
+              <br><br>
+              <span style="font-size: 0.9em; opacity: 0.9; color: #ffeb3b;">
+                ⚠️ <b>Если пользователь уже был создан ранее без триггера:</b> либо удалите его и создайте заново, либо добавьте запись вручную через вкладку SQL Editor в Supabase:<br>
+                <code>INSERT INTO public.admin_users (id, username) VALUES ('UID_ПОЛЬЗОВАТЕЛЯ_ИЗ_AUTH', 'admin');</code>
+              </span>
             </li>
           </ol>
         </div>
