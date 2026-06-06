@@ -161,6 +161,93 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 
+  // ---- КЛИЕНТСКОЕ КЭШИРОВАНИЕ ДЛЯ МГНОВЕННОГО ОТКРЫТИЯ ----
+  const CACHE_KEY = "go_promo_site_cache_v1.0.0";
+  const CACHE_VERSION = "1.0.0";
+
+  function applyCache() {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return false;
+
+      const cache = JSON.parse(cached);
+      if (!cache || cache.cache_version !== CACHE_VERSION || !cache.config || !cache.prizes) {
+        console.warn("Обнаружен старый/некорректный кэш, сбрасываем...");
+        localStorage.removeItem(CACHE_KEY);
+        return false;
+      }
+
+      // Применяем кэшированный конфиг к глобальной переменной config
+      config = { ...config, ...cache.config, prizes: cache.prizes };
+
+      // Мгновенное наполнение DOM из кэша (First Screen)
+      if (config.heroTitle) {
+        const titleNode = document.getElementById("hero-title");
+        if (titleNode) titleNode.textContent = config.heroTitle;
+      }
+      if (config.heroSubtitle) {
+        const subtitleNode = document.getElementById("hero-prize-text");
+        if (subtitleNode) subtitleNode.textContent = config.heroSubtitle;
+      }
+      if (config.minPurchaseAmount) {
+        const m1 = document.getElementById("promoMinAmountText1");
+        if (m1) m1.textContent = config.minPurchaseAmount;
+        const m2 = document.getElementById("promoMinAmountText2");
+        if (m2) m2.textContent = config.minPurchaseAmount;
+        const amountInput = document.getElementById("amount");
+        if (amountInput) {
+          amountInput.setAttribute("min", config.minPurchaseAmount);
+          amountInput.setAttribute("placeholder", "Минимум " + config.minPurchaseAmount + " рублей");
+        }
+      }
+
+      // Мгновенно рендерим призы
+      updateFrontEndPrizesUI(config.prizes);
+
+      // Обновляем даты, календарь и таймер обратного отсчета
+      updateDynamicDateTexts();
+      initDatePicker();
+      checkRegistrationPeriod();
+      updateCountdown();
+
+      console.log("Первый экран полностью и мгновенно восстановлен из локального кэша!");
+      return true;
+    } catch (err) {
+      console.warn("Ошибка восстановления кэша из localStorage:", err);
+      try {
+        localStorage.removeItem(CACHE_KEY);
+      } catch (_) {}
+      return false;
+    }
+  }
+
+  function saveToCache() {
+    try {
+      const cacheData = {
+        cache_version: CACHE_VERSION,
+        lastUpdated: Date.now(),
+        config: {
+          startDate: config.startDate,
+          endDate: config.endDate,
+          drawDate: config.drawDate,
+          registrationEnabled: config.registrationEnabled !== false,
+          winnersPublished: config.winnersPublished === true,
+          minPurchaseAmount: config.minPurchaseAmount || 1500,
+          heroTitle: config.heroTitle || "",
+          heroSubtitle: config.heroSubtitle || ""
+        },
+        prizes: config.prizes || []
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      console.log("Локальный кэш успешно обновлен:", cacheData);
+    } catch (err) {
+      console.warn("Ошибка записи кэша в localStorage:", err);
+    }
+  }
+
+  // Применяем кэш мгновенно при старте скрипта (до любых сетевых запросов к Supabase/серверу)
+  applyCache();
+
   // 1. Инициализация (Загрузка конфигурации)
   try {
     const fetchUrl = "config.json?v=" + Date.now();
@@ -168,7 +255,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!res.ok) {
       throw new Error(`Статус ответа: ${res.status}`);
     }
-    config = await res.json();
+    const serverConfig = await res.json();
+    
+    // Объединяем полученный конфиг с текущим состоянием (чтобы сохранить временные значения кэша)
+    config = { ...config, ...serverConfig };
     
     // Проверяем наличие ключей Supabase. Если их нет, включаем демо-режим.
     useMock = !config.supabaseUrl || config.supabaseUrl.trim() === "" || config.supabaseUrl === "https://your-project-id.supabase.co";
@@ -181,10 +271,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSettings();
     await loadPrizes();
 
-    // Обновляем тексты и инициализируем календарь
+    // Обновляем тексты и инициализируем календарь со свежими данными
     updateDynamicDateTexts();
     initDatePicker();
     checkRegistrationPeriod();
+    
+    // Сохраняем в кэш полученное актуальное состояние для последующих входов
+    saveToCache();
 
     // Авто-проверка сессии Supabase (сохранение логина при обновлении)
     if (supabase) {
@@ -2366,6 +2459,7 @@ ${badgeHtml}
         initDatePicker();
         checkRegistrationPeriod();
         fillSettingsInputs();
+        saveToCache();
       } catch (err) {
         console.error("Ошибка при сохранении настроек:", err);
         msg.textContent = "Произошла ошибка связи с сервером.";
@@ -2534,6 +2628,7 @@ ${badgeHtml}
         updateFrontEndPrizesUI(newPrizes);
 
         fillSiteSettingsInputs();
+        saveToCache();
       } catch (err) {
         console.error("Ошибка при сохранении настроек сайта:", err);
         msg.textContent = "Произошла ошибка связи с сервером: " + err.message;
@@ -2610,6 +2705,7 @@ ${badgeHtml}
         if (m1) m1.innerHTML = minAmountVal;
         const m2 = document.getElementById("promoMinAmountText2");
         if (m2) m2.innerHTML = minAmountVal;
+        saveToCache();
       } catch (err) {
         console.error("Ошибка при сохранении суммы:", err);
         msg.style.display = "block";
