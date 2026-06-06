@@ -503,7 +503,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function checkRegistrationPeriod() {
     const regAlert = document.getElementById("registrationStatusAlert");
     const submitBtn = document.getElementById("submitBtn");
-    if (!regAlert || !submitBtn) return false;
+    const promoForm = document.getElementById("promoForm");
+    if (!regAlert || !submitBtn || !promoForm) return false;
 
     // Сначала смотрим принудительный флаг в настройках
     if (config.registrationEnabled === false) {
@@ -511,6 +512,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       regAlert.textContent = "Регистрация временно приостановлена администратором.";
       submitBtn.disabled = true;
       submitBtn.textContent = "РЕГИСТРАЦИЯ ПРИОСТАНОВЛЕНА";
+      promoForm.classList.add("registration-disabled");
       return false;
     }
 
@@ -525,6 +527,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       regAlert.textContent = `Регистрация чеков начнётся ${dateStr} в ${timeStr}.`;
       submitBtn.disabled = true;
       submitBtn.textContent = "РЕГИСТРАЦИЯ ЕЩЁ НЕ НАЧАЛАСЬ";
+      promoForm.classList.add("registration-disabled");
       return false;
     }
 
@@ -534,6 +537,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       regAlert.textContent = `Период регистрации чеков завершен ${dateStr}`;
       submitBtn.disabled = true;
       submitBtn.textContent = "РЕГИСТРАЦИЯ ЗАВЕРШЕНА";
+      promoForm.classList.add("registration-disabled");
       return false;
     }
 
@@ -541,6 +545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     regAlert.style.display = "none";
     submitBtn.disabled = false;
     submitBtn.textContent = "ЗАРЕГИСТРИРОВАТЬ ЧЕК";
+    promoForm.classList.remove("registration-disabled");
     return true;
   }
 
@@ -613,8 +618,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     const resultSection = document.getElementById("countdownMessage");
 
     if (diff <= 0) {
-      if (timerContainer) timerContainer.classList.add("hidden");
+      const titleEl = document.getElementById("countdownTitle");
+      if (titleEl) titleEl.textContent = "Розыгрыш завершен:";
+
+      const daysEl = document.getElementById("cdDays");
+      const hoursEl = document.getElementById("cdHours");
+      const minutesEl = document.getElementById("cdMinutes");
+      const secondsEl = document.getElementById("cdSeconds");
+
+      if (daysEl) daysEl.textContent = "00";
+      if (hoursEl) hoursEl.textContent = "00";
+      if (minutesEl) minutesEl.textContent = "00";
+      if (secondsEl) secondsEl.textContent = "00";
+
+      if (timerContainer) {
+        timerContainer.classList.remove("hidden");
+        timerContainer.classList.add("timer-ended");
+      }
       if (resultSection) resultSection.classList.remove("hidden");
+
       if (countdownTimer) clearInterval(countdownTimer);
       return;
     }

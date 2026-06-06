@@ -254,6 +254,36 @@ h1, h2, h3, h4, h5, h6 {
     padding: 60px 0;
 }
 
+.registration-disabled {
+    opacity: 0.8 !important;
+    filter: brightness(0.9) !important;
+}
+.registration-disabled input {
+    background-color: #1a1a1a !important;
+}
+.registration-disabled .btn-primary {
+    background-color: var(--primary) !important;
+    filter: saturate(0.3) brightness(0.7) !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+}
+.registration-disabled .btn-primary:hover {
+    background-color: var(--primary) !important;
+    filter: saturate(0.3) brightness(0.7) !important;
+}
+
+.timer-ended .countdown-item span {
+    color: #4a6a5a !important;
+    filter: brightness(0.8) !important;
+}
+.timer-ended .countdown-label {
+    color: #556655 !important;
+}
+.timer-ended .countdown-item {
+    border-color: #2a3a2a !important;
+}
+
 .winners-section {
     padding: 60px 0;
     display: none; /* Скрыто по умолчанию до загрузки или истечения таймера */
