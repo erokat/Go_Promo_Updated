@@ -1174,6 +1174,7 @@ span.flatpickr-weekday {
     height: 100%;
     background-color: #121212; /* Фирменный темный фон */
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 10000; /* Перекрывает все элементы, включая липкую шапку */
