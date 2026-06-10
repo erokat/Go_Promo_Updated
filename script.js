@@ -68,7 +68,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               parsed.winnersPublished === "true" ||
               parsed.winnersPublished === true;
           }
-          if (parsed.minPurchaseAmount) config.minPurchaseAmount = parseFloat(parsed.minPurchaseAmount);
+          if (parsed.minPurchaseAmount !== undefined && parsed.minPurchaseAmount !== null) config.minPurchaseAmount = parseFloat(parsed.minPurchaseAmount);
           if (parsed.heroTitle) config.heroTitle = parsed.heroTitle;
           if (parsed.heroSubtitle) config.heroSubtitle = parsed.heroSubtitle;
           if (parsed.configHash) config.configHash = parsed.configHash;
@@ -94,6 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           config.heroTitle = settingsMap.heroTitle;
           config.heroSubtitle = settingsMap.heroSubtitle;
           config.configHash = settingsMap.configHash || "";
+          console.log("[LOAD] config.minPurchaseAmount from Supabase =", config.minPurchaseAmount, "settingsMap.minPurchaseAmount = ", settingsMap.minPurchaseAmount);
         }
       } catch (err) {
         console.warn("Ошибка при получении настроек из Supabase:", err);
@@ -109,7 +110,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const subtitleNode = document.getElementById("hero-prize-text");
       if (subtitleNode) subtitleNode.textContent = config.heroSubtitle;
     }
-    if (config.minPurchaseAmount) {
+    if (config.minPurchaseAmount !== undefined && config.minPurchaseAmount !== null) {
       const m1 = document.getElementById("promoMinAmountText1");
       if (m1) m1.textContent = config.minPurchaseAmount;
       const m2 = document.getElementById("promoMinAmountText2");
@@ -194,7 +195,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const subtitleNode = document.getElementById("hero-prize-text");
         if (subtitleNode) subtitleNode.textContent = config.heroSubtitle;
       }
-      if (config.minPurchaseAmount) {
+      if (config.minPurchaseAmount !== undefined && config.minPurchaseAmount !== null) {
         const m1 = document.getElementById("promoMinAmountText1");
         if (m1) m1.textContent = config.minPurchaseAmount;
         const m2 = document.getElementById("promoMinAmountText2");
@@ -284,7 +285,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           drawDate: config.drawDate,
           registrationEnabled: config.registrationEnabled !== false,
           winnersPublished: config.winnersPublished === true,
-          minPurchaseAmount: config.minPurchaseAmount || 1500,
+          minPurchaseAmount: (config.minPurchaseAmount !== undefined && config.minPurchaseAmount !== null) ? config.minPurchaseAmount : 1500,
           heroTitle: config.heroTitle || "",
           heroSubtitle: config.heroSubtitle || "",
           configHash: activeHash
@@ -1128,7 +1129,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Проверка суммы покупки
-    const requiredMinAmount = config.minPurchaseAmount || 1500;
+    const requiredMinAmount = (config.minPurchaseAmount !== undefined && config.minPurchaseAmount !== null) ? config.minPurchaseAmount : 1500;
     
     if (isNaN(amountVal) || amountVal < requiredMinAmount) {
       msg.textContent =
@@ -2546,11 +2547,6 @@ ${badgeHtml}
   function fillSiteSettingsInputs() {
     const titleInput = document.getElementById("adminSiteTitle");
     const subtitleInput = document.getElementById("adminSiteSubtitle");
-    const minAmountInput = document.getElementById("adminMinAmount");
-    
-    if (minAmountInput) {
-      minAmountInput.value = config.minPurchaseAmount ? config.minPurchaseAmount.toString() : "1500";
-    }
     
     const heroTitleNode = document.getElementById("hero-title");
     if (titleInput) {
@@ -2576,9 +2572,11 @@ ${badgeHtml}
   }
 
   function fillSettingsInputs() {
+    console.log("[FILL SETTINGS] before =", config.minPurchaseAmount);
     const startInput = document.getElementById("adminStartDate");
     const endInput = document.getElementById("adminEndDate");
     const drawInput = document.getElementById("adminDrawDate");
+    const minAmountInput = document.getElementById("adminMinAmount");
 
     if (startInput && config.startDate) {
       startInput.value = formatAdminDate(new Date(config.startDate));
@@ -2592,11 +2590,22 @@ ${badgeHtml}
       drawInput.value = formatAdminDate(new Date(config.drawDate));
     }
 
+    if (minAmountInput) {
+      if (config.minPurchaseAmount !== undefined && config.minPurchaseAmount !== null) {
+        minAmountInput.value = config.minPurchaseAmount.toString();
+      } else {
+        minAmountInput.value = "1500";
+      }
+      console.log("[ADMIN INPUT VALUE] =", minAmountInput.value);
+    }
+
     const publishInput = document.getElementById("publishWinners");
     if (publishInput) {
       publishInput.checked = config.winnersPublished === true;
     }
 
+    console.log("[ADMIN INPUT VALUE] =", document.getElementById("adminMinAmount")?.value);
+    
     updateRegistrationStatusUI();
   }
 
@@ -2718,9 +2727,10 @@ ${badgeHtml}
           config.drawDate = parsedDraw;
           config.winnersPublished = newSettings.winnersPublished;
           config.configHash = calculatedHash;
-
-          localStorage.setItem("lottery_settings", JSON.stringify(newSettings));
+          
           config = { ...config, ...newSettings };
+          localStorage.setItem("lottery_settings", JSON.stringify(config));
+          
           msg.textContent = "Настройки успешно сохранены локально в демо-режиме.";
           msg.className = "message success";
         } else {
@@ -2783,6 +2793,7 @@ ${badgeHtml}
     });
 
     tabSettings.addEventListener("click", async () => {
+      await loadSettings();
       await loadPrizes();
       tabSettings.classList.add("active");
       tabSettings.style.color = "var(--primary)";
@@ -3086,6 +3097,7 @@ ${badgeHtml}
       msg.className = "message";
 
       const parsedAmount = parseFloat(minAmountVal);
+      console.log("[SAVE MIN AMOUNT] parsedAmount =", parsedAmount);
 
       try {
         const nextHash = calculateConfigHash(
