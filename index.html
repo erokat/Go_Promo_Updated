@@ -333,6 +333,20 @@
               </div>
             </div>
             <div id="registrationStatusAlert" style="display: none; background: #1e1e1e; border: 1px solid #06a658; color: #06a658; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: 500;"></div>
+            <div id="consentContainer" class="form-group" style="display: none; margin-top: 26px; margin-bottom: 26px;">
+              <label class="consent-label">
+                <span class="checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    id="consentCheckbox"
+                    class="hidden-native-checkbox"
+                    aria-label="Согласие на обработку персональных данных"
+                  />
+                  <span class="custom-checkbox"></span>
+                </span>
+                <span class="consent-text">Я даю согласие на обработку моих персональных данных</span>
+              </label>
+            </div>
             <div id="formMessage" class="message"></div>
             <button type="submit" class="btn btn-primary" id="submitBtn" style="text-transform: uppercase;">
               Зарегистрировать чек
