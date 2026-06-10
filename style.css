@@ -338,7 +338,7 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     display: block;
     left: 7px;
-    top: 5px;
+    top: 0px;
     width: 6px;
     height: 12px;
     border: solid white;
