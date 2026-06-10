@@ -282,14 +282,18 @@ h1, h2, h3, h4, h5, h6 {
     user-select: none;
     font-size: 0.95rem;
     line-height: 1.2; /* Устанавливаем высоту строки строго равную геометрической высоте чекбокса */
-    color: #06a658; /* Брендовый цвет */
+    color: var(--text-color, #e0e0e0); /* Цвет под элементы сайта */
     text-align: left;
     width: 100%;
     transition: color 0.2s ease;
 }
 
 .consent-label:hover {
-    color: #08c267 !important;
+    color: #06a658 !important; /* Зеленый при наведении */
+}
+
+.consent-label:has(#consentCheckbox:checked) {
+    color: #06a658; /* Зеленый когда галочка стоит */
 }
 
 .checkbox-wrapper {
