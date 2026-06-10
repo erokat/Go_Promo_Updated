@@ -273,6 +273,95 @@ h1, h2, h3, h4, h5, h6 {
     filter: saturate(0.3) brightness(0.7) !important;
 }
 
+/* ---- Кастомный чекбокс согласия ---- */
+.consent-label {
+    display: flex;
+    align-items: flex-start; /* Технически правильный подход: выравнивание по первой строке */
+    gap: 15px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.95rem;
+    line-height: 24px; /* Устанавливаем высоту строки строго равную геометрической высоте чекбокса */
+    color: #06a658; /* Брендовый цвет */
+    text-align: left;
+    width: 100%;
+    transition: color 0.2s ease;
+}
+
+.consent-label:hover {
+    color: #08c267 !important;
+}
+
+.checkbox-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.hidden-native-checkbox {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+    margin: 0;
+}
+
+#consentCheckbox + .custom-checkbox {
+    position: relative;
+    display: block;
+    height: 24px;
+    width: 24px;
+    background-color: #1a1a1a;
+    border: 2px solid #332f2f;
+    border-radius: 6px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+}
+
+.consent-label:hover #consentCheckbox:not(:disabled) + .custom-checkbox {
+    border-color: var(--primary, #06a658);
+    box-shadow: 0 0 0 3px rgba(6, 166, 88, 0.15);
+}
+
+#consentCheckbox:checked + .custom-checkbox {
+    background-color: #06a658;
+    border-color: #06a658;
+}
+
+#consentCheckbox:checked + .custom-checkbox::after {
+    content: "";
+    position: absolute;
+    display: block;
+    left: 8px;
+    top: 3.5px;
+    width: 6px;
+    height: 12px;
+    border: solid white;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg);
+}
+
+#consentCheckbox:focus-visible + .custom-checkbox {
+    border-color: var(--primary, #06a658);
+    box-shadow: 0 0 0 3px rgba(6, 166, 88, 0.3);
+}
+
+/* Стили кнопки «Зарегистрировать чек», когда она disabled по причине отсутствия согласия */
+.submit-btn-consent-disabled {
+    background-color: #555555 !important;
+    color: #888888 !important;
+    border-color: #555555 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+}
+
+
 .timer-ended .countdown-item span {
     color: #4a6a5a !important;
     filter: brightness(0.8) !important;

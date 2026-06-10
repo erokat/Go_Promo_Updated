@@ -182,6 +182,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Применяем кэшированный конфиг к глобальной переменной config
       config = { ...config, ...cache.config, prizes: cache.prizes };
+      localHash = cache.config.configHash || "";
+      hasLocalCache = true;
 
       // Мгновенное наполнение DOM из кэша (First Screen)
       if (config.heroTitle) {
@@ -235,7 +237,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Расчет хэша конфигурации первого экрана
-  function calculateConfigHash(drawDate, heroTitle, heroSubtitle, minAmount, prizes) {
+  function calculateConfigHash(
+    drawDate = config.drawDate,
+    startDate = config.startDate,
+    endDate = config.endDate,
+    heroTitle = config.heroTitle,
+    heroSubtitle = config.heroSubtitle,
+    minPurchaseAmount = config.minPurchaseAmount,
+    registrationEnabled = config.registrationEnabled,
+    winnersPublished = config.winnersPublished,
+    prizes = config.prizes
+  ) {
     const cleanPrizes = (prizes || []).slice().sort((a, b) => (a.id || 0) - (b.id || 0)).map(p => ({
       id: p.id || 0,
       name: p.name || "",
@@ -244,9 +256,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const rawString = JSON.stringify({
       drawDate: drawDate || "",
+      startDate: startDate || "",
+      endDate: endDate || "",
       heroTitle: heroTitle || "",
       heroSubtitle: heroSubtitle || "",
-      minAmount: String(minAmount || "1500"),
+      minPurchaseAmount: minPurchaseAmount !== undefined ? minPurchaseAmount : 1500,
+      registrationEnabled: registrationEnabled !== false,
+      winnersPublished: winnersPublished === true,
       prizes: cleanPrizes
     });
 
@@ -255,13 +271,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function saveToCache(customHash = null) {
     try {
-      const activeHash = customHash || calculateConfigHash(
-        config.drawDate,
-        config.heroTitle,
-        config.heroSubtitle,
-        config.minPurchaseAmount,
-        config.prizes
-      );
+      const activeHash = customHash || calculateConfigHash();
 
       config.configHash = activeHash;
 
@@ -364,13 +374,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     const statusMsg = document.getElementById("loadingStatus");
     if (statusMsg) statusMsg.textContent = "";
 
+    // Шаг 0. Мгновенное применение локального кэша, если он существует.
+    // Это удовлетворяет требованию "сайт мгновенно показывает данные из localStorage"
+    const cacheApplied = applyCache();
+    if (cacheApplied) {
+      console.log("%c[Cache System] Мгновенно применен локальный кэш.", "color: #06a658; font-weight: bold;");
+    }
+
     // Таймеры для сообщений
     statusUpdateTimer1 = setTimeout(() => {
-      if (statusMsg) statusMsg.textContent = "Подключаемся к серверу и проверяем актуальность данных...";
+      if (statusMsg) {
+        if (!cacheApplied) {
+          statusMsg.textContent = "Подключаемся к серверу и проверяем актуальность данных...";
+        } else {
+          console.log("[Loader] Подключение к серверу занимает больше времени...");
+        }
+      }
     }, 10000);
 
     statusUpdateTimer2 = setTimeout(() => {
-      if (statusMsg) statusMsg.textContent = "Подключение занимает больше времени, чем обычно. Проверьте подключение к интернету или попробуйте открыть сайт позже.";
+      if (statusMsg) {
+        if (!cacheApplied) {
+          statusMsg.textContent = "Подключение занимает больше времени, чем обычно. Проверьте подключение к интернету или попробуйте открыть сайт позже.";
+        } else {
+          console.log("[Loader] Длительное подключение к серверу, продолжаем работу на локальном кэше.");
+        }
+      }
     }, 30000);
 
     try {
@@ -389,10 +418,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
       }
 
-      // 2. Получение и сравнение хеша
+      // 2. Логика запуска в демо-режиме
+      if (useMock || !supabase) {
+        clearTimeout(statusUpdateTimer1);
+        clearTimeout(statusUpdateTimer2);
+        
+        if (cacheApplied) {
+          console.log("%c[Cache System] Быстрый запуск в демо-режиме из кэша.", "color: #06a658; font-weight: bold;");
+          hidePreloader("mock_cache_applied");
+        } else {
+          console.log("%c[Cache System] Отсутствует кэш в демо-режиме, загрузка по умолчанию.", "color: #ff9f43; font-weight: bold;");
+          await fullLoad();
+        }
+        connectionAttempts = 0;
+        return;
+      }
+
+      // 3. Параллельная/фоновая загрузка configHash из Supabase
       let serverHash = null;
 
-      if (!useMock && supabase) {
+      try {
         // Запрос с таймаутом
         const fetchHashPromise = supabase
           .from("settings")
@@ -410,21 +455,36 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         if (error) throw error;
         serverHash = data ? data.value : null;
+      } catch (hashErr) {
+        console.warn("[Loader] Не удалось загрузить configHash из бэкенда:", hashErr.message);
+        
+        // КРИТИЧЕСКИ ВАЖНО: Если произошел сбой сети или таймаут, а у нас ЕСТЬ локальный кэш,
+        // мы ни в коем случае не вешаем сайт! Даем пользователю продолжить работу на локальном кэше.
+        if (cacheApplied) {
+          console.log("%c[Cache System] Ошибка сети при проверке хэша. Продолжаем работу на кэше.", "color: #ff9f43; font-weight: bold;");
+          clearTimeout(statusUpdateTimer1);
+          clearTimeout(statusUpdateTimer2);
+          hidePreloader("network_failure_cache_fallback");
+          connectionAttempts = 0;
+          return;
+        } else {
+          // Если локального кэша нет, то у нас нет данных для показа — выбрасываем исключение для повторной попытки
+          throw hashErr;
+        }
       }
 
       // Очистка таймеров
       clearTimeout(statusUpdateTimer1);
       clearTimeout(statusUpdateTimer2);
 
-      // 3. Логика запуска
-      if (hasLocalCache && serverHash && serverHash === localHash) {
-        console.log("%c[Cache System] Хэши совпадают. Быстрый запуск.", "color: #06a658; font-weight: bold;");
-        applyCache();
+      // Сравнение хэшей
+      if (cacheApplied && serverHash && serverHash === localHash) {
+        console.log("%c[Cache System] Хэши совпадают. Продолжаем использовать кэш.", "color: #06a658; font-weight: bold;");
         hidePreloader("cache_hash_match");
         connectionAttempts = 0;
       } 
       else {
-        console.log("%c[Cache System] Требуется полная загрузка.", "color: #ff9f43; font-weight: bold;");
+        console.log("%c[Cache System] Хэши не совпадают или кэш отсутствует. Загружаем свежие данные.", "color: #ff9f43; font-weight: bold;");
         await fullLoad(serverHash);
         connectionAttempts = 0;
       }
@@ -457,7 +517,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await loadSettings();
       await loadPrizes();
       
-      const newHash = forcedHash || calculateConfigHash(config.drawDate, config.heroTitle, config.heroSubtitle, config.minPurchaseAmount, config.prizes);
+      const newHash = forcedHash || calculateConfigHash();
       config.configHash = newHash;
       
       updateDynamicDateTexts();
@@ -499,12 +559,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     return formatted;
   }
 
-  // Проверка периода регистрации
+  // Проверка периода регистрации и согласия на обработку ПД
   function checkRegistrationPeriod() {
     const regAlert = document.getElementById("registrationStatusAlert");
     const submitBtn = document.getElementById("submitBtn");
     const promoForm = document.getElementById("promoForm");
+    const consentContainer = document.getElementById("consentContainer");
+    const consentCheckbox = document.getElementById("consentCheckbox");
+
     if (!regAlert || !submitBtn || !promoForm) return false;
+
+    let isRegOpen = true;
 
     // Сначала смотрим принудительный флаг в настройках
     if (config.registrationEnabled === false) {
@@ -513,40 +578,61 @@ document.addEventListener("DOMContentLoaded", async () => {
       submitBtn.disabled = true;
       submitBtn.textContent = "РЕГИСТРАЦИЯ ПРИОСТАНОВЛЕНА";
       promoForm.classList.add("registration-disabled");
-      return false;
+      submitBtn.classList.remove("submit-btn-consent-disabled");
+      isRegOpen = false;
+    } else {
+      const now = new Date();
+      const start = config.startDate ? new Date(config.startDate) : new Date("2026-06-01T00:00:00");
+      const end = config.endDate ? new Date(config.endDate) : new Date("2026-06-30T23:59:00");
+
+      if (now < start) {
+        regAlert.style.display = "block";
+        const dateStr = formatDateRu(start, true);
+        const timeStr = start.toLocaleTimeString("ru-RU", { hour: '2-digit', minute: '2-digit' });
+        regAlert.textContent = `Регистрация чеков начнётся ${dateStr} в ${timeStr}.`;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "РЕГИСТРАЦИЯ ЕЩЁ НЕ НАЧАЛАСЬ";
+        promoForm.classList.add("registration-disabled");
+        submitBtn.classList.remove("submit-btn-consent-disabled");
+        isRegOpen = false;
+      } else if (now > end) {
+        regAlert.style.display = "block";
+        const dateStr = formatDateRu(end, true);
+        regAlert.textContent = `Период регистрации чеков завершен ${dateStr}`;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "РЕГИСТРАЦИЯ ЗАВЕРШЕНА";
+        promoForm.classList.add("registration-disabled");
+        submitBtn.classList.remove("submit-btn-consent-disabled");
+        isRegOpen = false;
+      }
     }
 
-    const now = new Date();
-    const start = config.startDate ? new Date(config.startDate) : new Date("2026-06-01T00:00:00");
-    const end = config.endDate ? new Date(config.endDate) : new Date("2026-06-30T23:59:00");
-
-    if (now < start) {
-      regAlert.style.display = "block";
-      const dateStr = formatDateRu(start, true);
-      const timeStr = start.toLocaleTimeString("ru-RU", { hour: '2-digit', minute: '2-digit' });
-      regAlert.textContent = `Регистрация чеков начнётся ${dateStr} в ${timeStr}.`;
-      submitBtn.disabled = true;
-      submitBtn.textContent = "РЕГИСТРАЦИЯ ЕЩЁ НЕ НАЧАЛАСЬ";
-      promoForm.classList.add("registration-disabled");
-      return false;
-    }
-
-    if (now > end) {
-      regAlert.style.display = "block";
-      const dateStr = formatDateRu(end, true);
-      regAlert.textContent = `Период регистрации чеков завершен ${dateStr}`;
-      submitBtn.disabled = true;
-      submitBtn.textContent = "РЕГИСТРАЦИЯ ЗАВЕРШЕНА";
-      promoForm.classList.add("registration-disabled");
+    if (!isRegOpen) {
+      if (consentContainer) {
+        consentContainer.style.display = "none";
+      }
       return false;
     }
 
     // Регистрация открыта
     regAlert.style.display = "none";
-    submitBtn.disabled = false;
-    submitBtn.textContent = "ЗАРЕГИСТРИРОВАТЬ ЧЕК";
     promoForm.classList.remove("registration-disabled");
-    return true;
+
+    if (consentContainer) {
+      consentContainer.style.display = "block";
+    }
+
+    if (consentCheckbox && !consentCheckbox.checked) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add("submit-btn-consent-disabled");
+      submitBtn.textContent = "ЗАРЕГИСТРИРОВАТЬ ЧЕК";
+      return false; // Возвращаем false, чтобы заблокировать отправку формы, пока нет галочки
+    } else {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove("submit-btn-consent-disabled");
+      submitBtn.textContent = "ЗАРЕГИСТРИРОВАТЬ ЧЕК";
+      return true;
+    }
   }
 
   // Обновление текстов дат на странице
@@ -988,6 +1074,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (timeOnlyInput) {
         timeOnlyInput.value = "";
       }
+      const consentCheckbox = document.getElementById("consentCheckbox");
+      if (consentCheckbox) {
+        consentCheckbox.checked = false;
+      }
+      setTimeout(() => {
+        checkRegistrationPeriod();
+      }, 0);
+    });
+  }
+
+  // Слушатель изменения состояния чекбокса согласия
+  const consentCheckboxForInit = document.getElementById("consentCheckbox");
+  if (consentCheckboxForInit) {
+    consentCheckboxForInit.addEventListener("change", () => {
+      checkRegistrationPeriod();
     });
   }
 
@@ -2377,17 +2478,13 @@ ${badgeHtml}
             await loadPrizes();
             await loadAdminData();
 
-            localPrizes.splice(deleteIndex, 1);
-            localPrizes.forEach((item, k) => {
-              item.idx = k + 1;
-            });
-
-            const newSyncPrizes = localPrizes.map(p => ({
-              id: p.idx,
-              name: p.name,
-              link: p.link
+            // Синхронизируем локальный редактируемый массив с тем, что реально записано в бэкенде после удаления
+            localPrizes = config.prizes.map((p, i) => ({
+              idx: p.id || (i + 1),
+              name: p.name || "",
+              link: p.link || ""
             }));
-            config.prizes = newSyncPrizes;
+
             renderAdminPrizes();
 
           } catch (err) {
@@ -2432,6 +2529,9 @@ ${badgeHtml}
           localStorage.setItem("lottery_prizes", JSON.stringify(newSyncPrizes));
           renderAdminPrizes();
         }
+
+        // Обновляем хэш конфигурации и сохраняем его в базу / кэш
+        await recalculateAndSaveConfigHash();
 
         // Обновляем UI
         if (!useMock && supabase) {
@@ -2589,7 +2689,17 @@ ${badgeHtml}
       msg.textContent = "";
       msg.className = "message";
 
-      const isDrawDateChanged = config.drawDate !== parsedDraw;
+      const calculatedHash = calculateConfigHash(
+        parsedDraw,
+        parsedStart,
+        parsedEnd,
+        config.heroTitle,
+        config.heroSubtitle,
+        config.minPurchaseAmount,
+        config.registrationEnabled !== false,
+        document.getElementById("publishWinners").checked,
+        config.prizes
+      );
 
       const newSettings = {
         startDate: parsedStart,
@@ -2597,33 +2707,30 @@ ${badgeHtml}
         drawDate: parsedDraw,
         registrationEnabled: config.registrationEnabled !== false,
         winnersPublished: document.getElementById("publishWinners").checked,
-        configHash: config.configHash || ""
+        configHash: calculatedHash
       };
 
       try {
         if (useMock || !supabase) {
           await new Promise((r) => setTimeout(r, 600));
-          if (isDrawDateChanged) {
-            config.drawDate = parsedDraw;
-            await recalculateAndSaveConfigHash();
-            newSettings.configHash = config.configHash;
-          }
+          config.startDate = parsedStart;
+          config.endDate = parsedEnd;
+          config.drawDate = parsedDraw;
+          config.winnersPublished = newSettings.winnersPublished;
+          config.configHash = calculatedHash;
+
           localStorage.setItem("lottery_settings", JSON.stringify(newSettings));
           config = { ...config, ...newSettings };
           msg.textContent = "Настройки успешно сохранены локально в демо-режиме.";
           msg.className = "message success";
         } else {
-          if (isDrawDateChanged) {
-            config.drawDate = parsedDraw;
-            await recalculateAndSaveConfigHash();
-            newSettings.configHash = config.configHash;
-          }
           const upsertSettings = [
             { key: "startDate", value: parsedStart },
             { key: "endDate", value: parsedEnd },
             { key: "drawDate", value: parsedDraw },
             { key: "registrationEnabled", value: String(newSettings.registrationEnabled) },
-            { key: "winnersPublished", value: String(newSettings.winnersPublished) }
+            { key: "winnersPublished", value: String(newSettings.winnersPublished) },
+            { key: "configHash", value: calculatedHash }
           ];
           const { error } = await supabase.from("settings").upsert(upsertSettings);
           if (error) throw error;
@@ -2749,17 +2856,12 @@ ${badgeHtml}
 
   // Вспомогательная функция для автоматического сохранения обновленного хэша в бэкенд
   async function recalculateAndSaveConfigHash() {
-    const nextHash = calculateConfigHash(
-      config.drawDate,
-      config.heroTitle,
-      config.heroSubtitle,
-      config.minPurchaseAmount,
-      config.prizes
-    );
+    const nextHash = calculateConfigHash();
     config.configHash = nextHash;
     
     if (useMock || !supabase) {
       console.log(`%c[Config Hashing] (Demo) Локальный расчет хэша первого экрана: ${nextHash}`, "color: #00bcd4; font-weight: bold;");
+      saveToCache(nextHash);
       return nextHash;
     }
     
@@ -2770,6 +2872,7 @@ ${badgeHtml}
       });
       if (error) throw error;
       console.log(`%c[Config Hashing] Хэш конфигурации сохранен в Supabase: ${nextHash}`, "color: #00bcd4; font-weight: bold;");
+      saveToCache(nextHash);
       return nextHash;
     } catch (err) {
       console.error("[Config Hashing] Критическая ошибка при сохранении хэша:", err);
@@ -2866,13 +2969,25 @@ ${badgeHtml}
       msg.className = "message";
 
       try {
+        const nextHash = calculateConfigHash(
+          config.drawDate,
+          config.startDate,
+          config.endDate,
+          titleVal,
+          subtitleVal,
+          config.minPurchaseAmount,
+          config.registrationEnabled,
+          config.winnersPublished,
+          newPrizes
+        );
+
         if (useMock || !supabase) {
           await new Promise((r) => setTimeout(r, 600));
           
           config.heroTitle = titleVal;
           config.heroSubtitle = subtitleVal;
           config.prizes = newPrizes;
-          await recalculateAndSaveConfigHash();
+          config.configHash = nextHash;
           
           localStorage.setItem("lottery_settings", JSON.stringify({
             startDate: config.startDate,
@@ -2883,7 +2998,7 @@ ${badgeHtml}
             minPurchaseAmount: config.minPurchaseAmount,
             heroTitle: titleVal,
             heroSubtitle: subtitleVal,
-            configHash: config.configHash
+            configHash: nextHash
           }));
           
           localStorage.setItem("lottery_prizes", JSON.stringify(newPrizes));
@@ -2897,7 +3012,8 @@ ${badgeHtml}
         } else {
           const upsertSettings = [
             { key: "heroTitle", value: titleVal },
-            { key: "heroSubtitle", value: subtitleVal }
+            { key: "heroSubtitle", value: subtitleVal },
+            { key: "configHash", value: nextHash }
           ];
           const { error: settingsError } = await supabase.from("settings").upsert(upsertSettings);
           if (settingsError) throw settingsError;
@@ -2919,8 +3035,7 @@ ${badgeHtml}
           config.heroTitle = titleVal;
           config.heroSubtitle = subtitleVal;
           config.prizes = newPrizes;
-
-          await recalculateAndSaveConfigHash();
+          config.configHash = nextHash;
 
           msg.textContent = "Настройки сайта изменены в базе данных.";
           msg.className = "message success";
@@ -2973,10 +3088,22 @@ ${badgeHtml}
       const parsedAmount = parseFloat(minAmountVal);
 
       try {
+        const nextHash = calculateConfigHash(
+          config.drawDate,
+          config.startDate,
+          config.endDate,
+          config.heroTitle,
+          config.heroSubtitle,
+          parsedAmount,
+          config.registrationEnabled,
+          config.winnersPublished,
+          config.prizes
+        );
+
         if (useMock || !supabase) {
           await new Promise(r => setTimeout(r, 600));
           config.minPurchaseAmount = parsedAmount;
-          await recalculateAndSaveConfigHash();
+          config.configHash = nextHash;
           
           localStorage.setItem("lottery_settings", JSON.stringify({
             startDate: config.startDate,
@@ -2987,7 +3114,7 @@ ${badgeHtml}
             minPurchaseAmount: minAmountVal,
             heroTitle: config.heroTitle,
             heroSubtitle: config.heroSubtitle,
-            configHash: config.configHash
+            configHash: nextHash
           }));
 
           msg.textContent = "Минимальная сумма покупки сохранена локально.";
@@ -2995,7 +3122,8 @@ ${badgeHtml}
           msg.style.display = "block";
         } else {
           const { error } = await supabase.from("settings").upsert([
-            { key: "minPurchaseAmount", value: minAmountVal }
+            { key: "minPurchaseAmount", value: minAmountVal },
+            { key: "configHash", value: nextHash }
           ]);
           if (error) throw error;
           
@@ -3006,7 +3134,7 @@ ${badgeHtml}
           }).select().maybeSingle();
           
           config.minPurchaseAmount = parsedAmount;
-          await recalculateAndSaveConfigHash();
+          config.configHash = nextHash;
           
           msg.textContent = "Сумма успешно сохранена в базе данных.";
           msg.className = "message success";
