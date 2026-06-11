@@ -472,6 +472,12 @@ h1, h2, h3, h4, h5, h6 {
     display: none;
     text-align: center;
     font-weight: 500;
+    transition: opacity 0.3s ease;
+    opacity: 1;
+}
+
+.message.hiding {
+    opacity: 0 !important;
 }
 
 .message.success {

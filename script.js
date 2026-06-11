@@ -1093,11 +1093,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  let messageHideTimeout = null;
+  let messageCleanupTimeout = null;
+
   // Регистрация чека
   promoForm.addEventListener("submit", async (e) => {
+    if (messageHideTimeout) {
+      clearTimeout(messageHideTimeout);
+      messageHideTimeout = null;
+    }
+    if (messageCleanupTimeout) {
+      clearTimeout(messageCleanupTimeout);
+      messageCleanupTimeout = null;
+    }
     e.preventDefault();
     const btn = document.getElementById("submitBtn");
     const msg = document.getElementById("formMessage");
+    
+    // Сбрасываем визуальное состояние сообщения при новой отправке
+    msg.className = "message";
+    msg.textContent = "";
 
     if (!checkRegistrationPeriod()) {
       return;
@@ -1213,6 +1228,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         msg.textContent = "Успех! Чек успешно зарегистрирован (демо-режим).";
         msg.className = "message success";
         promoForm.reset();
+
+        messageHideTimeout = setTimeout(() => {
+          msg.classList.add("hiding");
+          messageCleanupTimeout = setTimeout(() => {
+            msg.className = "message";
+            msg.textContent = "";
+            messageCleanupTimeout = null;
+          }, 400);
+          messageHideTimeout = null;
+        }, 8000);
       } else {
         // БОЕВОЙ РЕЖИМ (Supabase)
         // Вставка с автоматической серверной валидацией через SQL TRIGGER
@@ -1241,6 +1266,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         msg.textContent = "Чек успешно зарегистрирован! Желаем удачи.";
         msg.className = "message success";
         promoForm.reset();
+
+        messageHideTimeout = setTimeout(() => {
+          msg.classList.add("hiding");
+          messageCleanupTimeout = setTimeout(() => {
+            msg.className = "message";
+            msg.textContent = "";
+            messageCleanupTimeout = null;
+          }, 400);
+          messageHideTimeout = null;
+        }, 8000);
       }
     } catch (err) {
       msg.textContent =
