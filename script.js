@@ -1237,7 +1237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             messageCleanupTimeout = null;
           }, 400);
           messageHideTimeout = null;
-        }, 8000);
+        }, 5000);
       } else {
         // БОЕВОЙ РЕЖИМ (Supabase)
         // Вставка с автоматической серверной валидацией через SQL TRIGGER
@@ -1275,7 +1275,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             messageCleanupTimeout = null;
           }, 400);
           messageHideTimeout = null;
-        }, 8000);
+        }, 5000);
       }
     } catch (err) {
       msg.textContent =
