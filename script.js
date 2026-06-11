@@ -1121,8 +1121,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // Фискальный код: начало 000081 и длина 12 цифр
-    if (!receipt.startsWith("000081") || !/^\d{12}$/.test(receipt)) {
+    // Фискальный код: начало 0000 и длина 12 цифр
+    if (!receipt.startsWith("0000") || !/^\d{12}$/.test(receipt)) {
       msg.textContent = "Неправильный код чека";
       msg.className = "message error";
       return;
